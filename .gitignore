@@ -1,0 +1,22 @@
+# Priklausomybės
+node_modules/
+.pnp
+.pnp.js
+
+# Gamybiniai failai (build)
+dist/
+build/
+
+# Aplinkos kintamieji (SVARBU saugumui)
+.env
+.env.local
+.env.development.local
+
+# Log failai
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Operacinės sistemos šiukšlės
+.DS_Store
+Thumbs.db
