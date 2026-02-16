@@ -23,7 +23,10 @@ const CreateRoomPage = () => {
       return;
     }
 
-    console.log("Sending create_room event with name:", roomName);
+    // Pridedame klausymąsi vieną kartą (once), kad po sėkmės nukreiptų
+    socket.once("join_success", (roomId) => {
+      navigate(`/room/${roomId}`); // Iškart į kambarį, ne į lobby!
+    });
 
     // Išsiunčiame duomenis serveriui
     socket.emit("create_room", {

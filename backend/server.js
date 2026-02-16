@@ -29,16 +29,87 @@ io.on("connection", (socket) => {
       id: Math.random().toString(36).substring(7),
       name: data.name,
       host: data.host,
-      playerCount: 1,
+      // Vietoj playerCount: 1, saugome pilną žaidėjo objektą
+      players: [{ id: socket.id, username: data.host, isReady: false }],
       maxPlayers: 4,
-      status: "waiting",
     };
-
     rooms.push(newRoom);
+    socket.join(newRoom.id);
 
-    // Siunčiam atnaujintą sąrašą VISIEMS
     io.emit("update_rooms", rooms);
-    console.log("New room created:", newRoom.name);
+    socket.emit("join_success", newRoom.id);
+
+    console.log("Created room", rooms);
+  });
+
+  // Žaidėjo prisijungimas prie kambario
+
+  socket.on("join_room", (data) => {
+    // Saugiklis: jei netyčia atėjo tik stringas, paverčiam objektu
+    const roomId = typeof data === "string" ? data : data.roomId;
+    const username = data.username || "Guest";
+
+    console.log(`Bandoma jungtis prie: ${roomId}, Vartotojas: ${username}`);
+
+    const room = rooms.find((r) => r.id === roomId);
+
+    if (!room) {
+      console.log("KLAIDA: Kambarys nerastas!");
+      socket.emit("error_message", "Room not found");
+      return;
+    }
+
+    if (room.players.length < room.maxPlayers) {
+      // Tikriname, ar žaidėjas jau yra (pagal socket.id)
+      const exists = room.players.find((p) => p.id === socket.id);
+
+      if (!exists) {
+        room.players.push({
+          id: socket.id,
+          username: username,
+          isReady: false,
+        });
+        socket.join(roomId);
+      }
+
+      // SVARBU: Išsiunčiam visiems atnaujinimą
+      io.emit("update_rooms", rooms);
+
+      // SVARBU: Patvirtiname būtent šiam socketui, kad pavyko
+      socket.emit("join_success", roomId);
+
+      console.log("SĖKMĖ: Žaidėjas pridėtas.");
+    } else {
+      socket.emit("error_message", "Room is full");
+    }
+  });
+
+  socket.on("leave_room", (roomId) => {
+    const room = rooms.find((r) => r.id === roomId);
+    if (room) {
+      // Pašaliname žaidėją iš masyvo pagal jo socket.id
+      room.players = room.players.filter((p) => p.id !== socket.id);
+
+      if (room.players.length === 0) {
+        rooms = rooms.filter((r) => r.id !== roomId);
+      }
+
+      io.emit("update_rooms", rooms);
+      socket.leave(roomId);
+    }
+  });
+
+  socket.on("toggle_ready", (roomId) => {
+    const room = rooms.find((r) => r.id === roomId);
+    if (room) {
+      const player = room.players.find((p) => p.id === socket.id);
+      if (player) {
+        player.isReady = !player.isReady; // Pakeičiam (true -> false arba false -> true)
+
+        // Išsiunčiam visiems atnaujintą sąrašą
+        io.emit("update_rooms", rooms);
+      }
+    }
   });
 
   socket.on("disconnect", () => {
