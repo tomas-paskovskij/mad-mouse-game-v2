@@ -3,148 +3,165 @@ import { useNavigate } from "react-router-dom";
 import { socket } from "../services/socket";
 import { useAuthStore } from "../store/useAuthStore";
 import { useLobbyStore } from "../store/useLobbyStore";
+import { useRoomStore } from "../store/useRoomStore";
 
 const LobbyListPage = () => {
   const navigate = useNavigate();
   const { username } = useAuthStore();
-  const { rooms } = useLobbyStore();
+  const { rooms, setRooms } = useLobbyStore();
+  const { clearRoom, setRoomData } = useRoomStore();
 
   useEffect(() => {
-    // Užtikriname, kad socketas prijungtas
-    if (!socket.connected) {
-      socket.connect();
-    }
+    if (!socket.connected) socket.connect();
 
-    // Klausomės join_success, kad nukreiptume į kambarį
+    // 1. Išvalome seną būseną
+    clearRoom();
+
+    // 2. Klausomės sąrašo atnaujinimų
+    socket.on("update_rooms", (serverRooms) => {
+      const formatted = serverRooms.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        host: r.host,
+        playerCount: r.players.length,
+        maxPlayers: r.maxPlayers,
+        hasPassword: !!r.password,
+      }));
+      setRooms(formatted);
+    });
+
+    // 3. Klausomės sėkmingo prisijungimo patvirtinimo
     socket.on("join_success", (roomId) => {
       navigate(`/room/${roomId}`);
     });
 
+    socket.emit("get_rooms");
+
     return () => {
+      socket.off("update_rooms");
       socket.off("join_success");
     };
-  }, [navigate]);
+  }, [navigate, setRooms, clearRoom]);
 
-  const handleJoin = (roomId: string) => {
-    if (!username) return;
+  const handleJoin = (room: any) => {
+    let passwordToSend: string | null = null;
 
-    // 1. Pirmiausia užregistruojame vienkartinį klausytoją sėkmei
-    socket.once("join_success", (id) => {
-      console.log("Gavau join_success, nukreipiu...");
-      navigate(`/room/${id}`);
-    });
+    if (room.hasPassword) {
+      const pass = prompt(
+        `[ENCRYPTION REQUIRED] Enter Access Key for ${room.name}:`,
+      );
+      if (pass === null) return;
+      passwordToSend = pass.trim();
+    }
 
-    // 2. Tada siunčiame žinutę
+    // Paruošiam store ir siunčiam užklausą
+    setRoomData({ id: room.id, password: passwordToSend }, username || "");
+
     socket.emit("join_room", {
-      roomId: roomId,
+      roomId: room.id,
       username: username,
+      password: passwordToSend,
     });
+
+    // navigate(`/room/${room.id}`);
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
-      {/* Viršutinė dalis su "Create" mygtuku */}
-      <div className="flex justify-between items-end mb-10">
+    <div className="max-w-4xl mx-auto px-4">
+      {/* HEADERIS */}
+      <div className="flex justify-between items-end mb-10 border-b border-slate-800 pb-6">
         <div>
-          <h2 className="text-4xl font-black text-white italic tracking-tighter uppercase">
-            Game <span className="text-indigo-500">Lobby</span>
+          <h2 className="text-4xl font-black uppercase italic tracking-tighter text-white">
+            Available <span className="text-indigo-500">Missions</span>
           </h2>
-          <p className="text-slate-500 font-bold text-xs uppercase tracking-[0.3em]">
-            Select an active session to join
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] mt-2 ml-1">
+            Status: Scanning for active signals...
           </p>
         </div>
+
         <button
           onClick={() => navigate("/create")}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white font-black px-8 py-4 rounded-2xl shadow-[0_0_20px_rgba(79,70,229,0.4)] transition-all hover:-translate-y-1 active:scale-95 uppercase text-sm tracking-widest"
+          className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] transition-all active:scale-95 shadow-lg shadow-indigo-900/40 border-b-4 border-indigo-800"
         >
-          + Create Room
+          Create New Mission
         </button>
       </div>
 
-      {/* Kambarių sąrašas */}
-      <div className="grid gap-4">
+      {/* KAMBARIŲ SĄRAŠAS */}
+      <div className="grid gap-6">
         {rooms.length === 0 ? (
-          <div className="bg-slate-800/30 border-2 border-dashed border-slate-700 rounded-[2rem] p-20 text-center">
-            <div className="text-5xl mb-4 opacity-20">🕳️</div>
-            <p className="text-slate-500 font-bold uppercase tracking-widest">
-              No active rooms found. Be the first to create one!
+          <div className="bg-slate-800/20 border-2 border-dashed border-slate-800 rounded-[3rem] py-24 text-center">
+            <div className="text-5xl mb-4 opacity-20">📡</div>
+            <p className="text-slate-600 font-black uppercase text-[10px] tracking-[0.5em]">
+              No encrypted signals detected in this sector
             </p>
           </div>
         ) : (
           rooms.map((room) => (
             <div
               key={room.id}
-              className="bg-slate-800 border border-slate-700 p-6 rounded-[1.5rem] flex flex-col md:flex-row justify-between items-center gap-6 hover:border-indigo-500/50 transition-all group shadow-xl"
+              className="bg-slate-800/50 border border-slate-700 p-8 rounded-[2.5rem] flex justify-between items-center group hover:bg-slate-800 hover:border-indigo-500/50 transition-all duration-300 shadow-xl"
             >
-              <div className="flex items-center gap-6 w-full md:w-auto">
-                <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center text-3xl border border-slate-700 group-hover:scale-110 transition-transform shadow-inner">
-                  🎮
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black text-white uppercase tracking-tight">
-                    {room.name}
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
-                      Hosted by{" "}
-                      <span className="text-indigo-400">{room.host}</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between w-full md:w-auto md:gap-8 bg-slate-900/50 md:bg-transparent p-4 md:p-0 rounded-xl">
-                <div className="flex flex-col items-center md:items-end">
-                  <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">
-                    Players
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`text-xl font-mono font-black ${room.players.length >= room.maxPlayers ? "text-red-500" : "text-white"}`}
-                    >
-                      {room.players.length}
-                    </span>
-                    <span className="text-slate-600 font-black">/</span>
-                    <span className="text-slate-400 font-mono font-bold">
-                      {room.maxPlayers}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleJoin(room.id)}
-                  disabled={room.playerCount >= room.maxPlayers}
-                  className={`px-10 py-4 rounded-xl font-black uppercase text-xs tracking-[0.2em] transition-all transform active:scale-95 shadow-lg ${
-                    room.playerCount >= room.maxPlayers
-                      ? "bg-slate-700 text-slate-500 cursor-not-allowed"
-                      : "bg-white text-slate-900 hover:bg-indigo-500 hover:text-white"
+              <div className="flex items-center gap-8">
+                {/* Status Icon */}
+                <div
+                  className={`w-16 h-16 rounded-3xl flex items-center justify-center text-2xl border-2 transition-all ${
+                    room.hasPassword
+                      ? "bg-slate-900 border-slate-700 text-slate-500 group-hover:border-amber-500/50 group-hover:text-amber-500"
+                      : "bg-slate-900 border-slate-700 text-slate-500 group-hover:border-indigo-500/50 group-hover:text-indigo-500"
                   }`}
                 >
-                  {room.players.length >= room.maxPlayers
-                    ? "Full"
-                    : "Join Room"}
-                </button>
+                  {room.hasPassword ? "🔒" : "🔓"}
+                </div>
+
+                <div>
+                  <h3 className="text-2xl font-black uppercase tracking-tight text-white group-hover:text-indigo-400 transition-colors">
+                    {room.name}
+                  </h3>
+                  <div className="flex items-center gap-4 mt-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                        Commander:
+                      </span>
+                      <span className="text-[11px] font-black text-slate-300 uppercase">
+                        {room.host}
+                      </span>
+                    </div>
+                    <span className="w-1.5 h-1.5 bg-slate-700 rounded-full"></span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                        Squad:
+                      </span>
+                      <span
+                        className={`text-[11px] font-black uppercase ${
+                          room.playerCount >= room.maxPlayers
+                            ? "text-red-500"
+                            : "text-indigo-400"
+                        }`}
+                      >
+                        {room.playerCount} / {room.maxPlayers}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
+
+              <button
+                onClick={() => handleJoin(room)}
+                disabled={room.playerCount >= room.maxPlayers}
+                className={`px-10 py-5 rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] transition-all ${
+                  room.playerCount >= room.maxPlayers
+                    ? "bg-slate-700 text-slate-500 cursor-not-allowed opacity-50"
+                    : "bg-white text-slate-900 hover:bg-indigo-500 hover:text-white active:scale-95 shadow-xl"
+                }`}
+              >
+                {room.playerCount >= room.maxPlayers
+                  ? "Mission Full"
+                  : "Deploy Join"}
+              </button>
             </div>
           ))
         )}
-      </div>
-
-      {/* Footer statistika */}
-      <div className="mt-10 flex justify-center gap-8 border-t border-slate-800 pt-8">
-        <div className="text-center">
-          <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">
-            Online Players
-          </p>
-          <p className="text-white font-mono font-bold">--</p>
-        </div>
-        <div className="text-center">
-          <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">
-            Active Rooms
-          </p>
-          <p className="text-white font-mono font-bold">{rooms.length}</p>
-        </div>
       </div>
     </div>
   );

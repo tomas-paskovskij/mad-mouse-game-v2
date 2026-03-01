@@ -6,6 +6,7 @@ const SOCKET_URL =
     : "https://ms7w8bsm-3000.euw.devtunnels.ms";
 
 export const socket = io(SOCKET_URL, {
-  transports: ["websocket"],
+  transports: ["websocket", "polling"], // Polling padeda, jei websocket blokuojamas
+  withCredentials: true,
   autoConnect: true,
 });

@@ -1,6 +1,6 @@
 import { create } from "zustand";
+import { devtools } from "zustand/middleware";
 
-// Žaidėjo objektas (vėliau čia pridėsim taškus, spalvas ir t.t.)
 interface Player {
   id: string;
   username: string;
@@ -8,48 +8,61 @@ interface Player {
 }
 
 interface RoomState {
-  currentRoomId: string | null;
+  roomId: string | null;
   roomName: string | null;
   hostName: string | null;
   players: Player[];
+  password: string | null;
   isAdmin: boolean;
-
-  // Veiksmai (Actions)
-  setRoomData: (
-    data: { id: string; name: string; host: string; players: Player[] },
-    currentUser: string,
-  ) => void;
-  updatePlayers: (players: Player[]) => void;
+  setRoomData: (data: any, currentUser?: string | null) => void;
   clearRoom: () => void;
 }
 
-export const useRoomStore = create<RoomState>((set) => ({
-  currentRoomId: null,
-  roomName: null,
-  hostName: null,
-  players: [],
-  isAdmin: false,
-
-  // Užpildome duomenis prisijungus prie kambario
-  setRoomData: (data, currentUser) =>
-    set({
-      currentRoomId: data.id,
-      roomName: data.name,
-      hostName: data.host,
-      players: data.players,
-      isAdmin: data.host === currentUser, // Patikrinam, ar vartotojas yra šeimininkas
-    }),
-
-  // Atnaujiname tik žaidėjų sąrašą (kai kas nors prisijungia/išeina)
-  updatePlayers: (players) => set({ players }),
-
-  // Išvalome viską išeidami iš kambario
-  clearRoom: () =>
-    set({
-      currentRoomId: null,
+// Svarbu: TypeScript reikalauja papildomų skliaustų po create<RoomState>()
+export const useRoomStore = create<RoomState>()(
+  devtools(
+    (set) => ({
+      roomId: null,
       roomName: null,
       hostName: null,
       players: [],
+      password: null,
       isAdmin: false,
+
+      setRoomData: (data, currentUser) => {
+        console.log("--- setRoomData buvo iškviestas su duomenimis:", data);
+        console.trace("Kvietimo kilmė:");
+        set(
+          {
+            roomId: data.id || data.roomId,
+            roomName: data.name || data.roomName,
+            hostName: data.host || data.hostName,
+            players: data.players || [],
+            password: data.password || null,
+            isAdmin: currentUser ? data.host === currentUser : false,
+          },
+          false, // 'replace' parametras (false reiškia merge)
+          "setRoomData", // Action pavadinimas, kurį matysi DevTools
+        );
+      },
+
+      clearRoom: () =>
+        set(
+          {
+            roomId: null,
+            roomName: null,
+            hostName: null,
+            players: [],
+            password: null,
+            isAdmin: false,
+          },
+          false,
+          "clearRoom",
+        ),
     }),
-}));
+    {
+      name: "RoomStore", // Store pavadinimas DevTools lange
+      enabled: true, // Galima palikti true arba import.meta.env.DEV
+    },
+  ),
+);
