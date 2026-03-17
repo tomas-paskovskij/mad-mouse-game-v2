@@ -1,85 +1,43 @@
-// src/components/game/PlayerHand.tsx
-import React from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Card from "./Card";
+import cardsData from "../../data/cards.json";
 import "./PlayerHand.css";
 
-// Laikini duomenys testavimui
-const initialCards = [
-  {
-    id: "1",
-    type: "action",
-    title: "Šokis",
-    description: "Visi turi sušokti makareną.",
-  },
-  {
-    id: "2",
-    type: "counter",
-    title: "STOP!",
-    description: "Atšauk bet kokį veiksmą.",
-  },
-  {
-    id: "3",
-    type: "trap",
-    title: "Spąstai",
-    description: "Padėk užverstą. Jei kas prabils, praranda kortą.",
-  },
-];
-
 const PlayerHand: React.FC = () => {
-  // Motion variantai rankos animacijai (kai atsiranda)
-  const containerVariants = {
-    initial: { y: 200 },
-    animate: { y: 0, transition: { staggerChildren: 0.1 } }, // Kortos atsiranda viena po kitos
-  };
+  // Paimame pirmas 5 kortas iš JSON kaip pradinę ranką
+  const [myCards, setMyCards] = useState(cardsData.slice(0, 5));
 
-  const cardInHandVariants = {
-    initial: { x: -500, rotate: -30, opacity: 0 },
-    animate: {
-      x: 0,
-      rotate: 0,
-      opacity: 1,
-      transition: { type: "spring", damping: 15 },
-    },
+  const playCard = (id: string) => {
+    // Animacija suveiks, nes naudojame AnimatePresence ir filter
+    setMyCards((prev) => prev.filter((c) => c.id !== id));
   };
 
   return (
     <div className="player-hand-area">
-      <div className="player-info">
-        <h3>Tavo ranka</h3>
-        <button className="mad-mouse-btn">MAD MOUSE! (3/10)</button>
-      </div>
-
-      <motion.div
-        className="hand-container"
-        variants={containerVariants}
-        initial="initial"
-        animate="animate"
-      >
+      <div className="hand-container">
         <AnimatePresence>
-          {
-            initialCards.map((card, index) => (
-              <motion.div
-                key={card.id}
-                className="card-wrapper"
-                variants={cardInHandVariants}
-                style={{
-                  // Sukuriame ventiliatoriaus efektą
-                  zIndex: index,
-                  rotate: (index - initialCards.length / 2) * 5,
-                  x: (index - initialCards.length / 2) * 10,
-                }}
-              >
-                <Card
-                  {...card}
-                  onClick={() => console.log("Išmesta korta:", card.title)}
-                />
-              </motion.div>
-            )) as any
-          }{" "}
-          {/* any reikalingas dėl TS ir Framer Motion AnimatePresence sąveikos */}
+          {myCards.map((card, index) => (
+            <motion.div
+              key={card.id}
+              layoutId={card.id}
+              initial={{ y: 150, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -200, opacity: 0, scale: 0.8 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              className="card-wrapper"
+              style={{ zIndex: index }}
+            >
+              <Card
+                {...card}
+                type={card.type as any}
+                onClick={() => playCard(card.id)}
+              />
+            </motion.div>
+          ))}
         </AnimatePresence>
-      </motion.div>
+      </div>
+      {/* Čia bus mygtukas iš 2 žingsnio */}
     </div>
   );
 };
