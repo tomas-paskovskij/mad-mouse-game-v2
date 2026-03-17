@@ -42,3 +42,31 @@
 .discard-wrapper {
   transform: rotate(-5deg); /* Šiek tiek pasukta */
 }
+
+.board-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.card-piles {
+  display: flex;
+  gap: 40px;
+}
+
+.timer-wrapper {
+  height: 40px; /* Rezervuojame vietą, kad stalas "nešokinėtų" atsiradus laikmačiui */
+  display: flex;
+  align-items: flex-end;
+}
+
+.pile-label {
+  position: absolute;
+  bottom: -25px;
+  font-size: 0.8rem;
+  opacity: 0.6;
+  width: 100%;
+  text-align: center;
+}
