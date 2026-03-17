@@ -1,0 +1,44 @@
+[
+  {
+    "id": "a1",
+    "type": "action",
+    "title": "Sūrio Vagis",
+    "description": "Pavok po 1 kortą iš visų žaidėjų."
+  },
+  {
+    "id": "a2",
+    "type": "action",
+    "title": "Chaosas",
+    "description": "Visi žaidėjai sumaišo savo kortas ir padalina jas iš naujo."
+  },
+  {
+    "id": "a3",
+    "type": "action",
+    "title": "Mainai",
+    "description": "Pasikeisk kortomis su pasirinktu žaidėju."
+  },
+  {
+    "id": "c1",
+    "type": "counter",
+    "title": "STOP!",
+    "description": "Atšauk bet kokį ką tik padėtą veiksmą."
+  },
+  {
+    "id": "c2",
+    "type": "counter",
+    "title": "Atgal tau",
+    "description": "Nukreipk veiksmą į tą, kuris jį paleido."
+  },
+  {
+    "id": "t1",
+    "type": "trap",
+    "title": "Pelėkautai",
+    "description": "Jei kas nors bando pavogti tavo kortą, jie praranda 2 savo kortas."
+  },
+  {
+    "id": "t2",
+    "type": "trap",
+    "title": "Nutilk",
+    "description": "Kas pirmas prabils, turi išmesti visas kortas."
+  }
+]
