@@ -1,51 +1,65 @@
-/* src/components/game/PlayerHand.css */
-.player-hand-area {
+.player-hand-wrapper {
   position: fixed;
   bottom: 0;
   left: 0;
-  width: 100%;
-  padding: 10px;
-  background-color: rgba(0, 0, 0, 0.5);
+  width: 100vw;
   display: flex;
   flex-direction: column;
   align-items: center;
-  z-index: 10;
-}
-
-.player-info {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  max-width: 1200px;
-  color: white;
-  margin-bottom: 10px;
-}
-
-.mad-mouse-btn {
-  background-color: #ffd700;
-  color: black;
-  font-weight: bold;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 20px;
-  cursor: pointer;
-  font-size: 1em;
+  padding-bottom: 20px;
+  z-index: 1000;
+  pointer-events: none;
+  /* Svarbu: neleidžiam atsirasti scrollbarams animacijos metu */
+  overflow: hidden;
 }
 
 .hand-container {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  margin-bottom: 20px;
-  height: 250px; /* Vietos hover efektui */
+  height: 250px;
+  pointer-events: auto;
+  position: relative;
+  /* Užtikrinam, kad konteineris nesiplėstų */
+  width: 100%;
 }
 
-.card-wrapper {
-  margin-left: -50px; /* Kortos persidengia */
-  transition: margin 0.3s ease;
+.card-slot {
+  position: relative;
+  margin: 0 -25px; /* Kortų persidengimas */
+  transition: transform 0.2s ease;
+  /* Svarbu: kad Framer Motion layoutId veiktų sklandžiai */
+  display: inline-block;
 }
 
-/* Kai užvedame pelę ant vienos kortos, kitos šiek tiek pasitraukia */
-.hand-container:hover .card-wrapper {
-  margin-left: 10px;
+/* Ši dalis sutvarko "dingimą" - korta išeidama nebestumia kitų */
+.card-slot[style*="position: absolute"] {
+  pointer-events: none;
+}
+
+.card-slot:hover {
+  z-index: 100;
+  transform: translateY(-20px);
+}
+
+.controls-area {
+  margin-top: 15px;
+  pointer-events: auto;
+}
+
+.mad-mouse-btn {
+  background: #222;
+  color: white;
+  border: 2px solid #444;
+  padding: 10px 25px;
+  border-radius: 30px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.mad-mouse-btn.active {
+  background: #ffd700;
+  color: black;
+  border-color: #ffaa00;
 }

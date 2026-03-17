@@ -5,67 +5,65 @@ import cardsData from "../../data/cards.json";
 import "./PlayerHand.css";
 
 const PlayerHand: React.FC = () => {
-  // Paimame kortas iš JSON
+  // Pradinės kortos iš JSON
   const [myCards, setMyCards] = useState(cardsData.slice(0, 5));
 
-  const playCard = (id: string) => {
-    setMyCards((prev) => prev.filter((c) => c.id !== id));
+  const playCard = (cardId: string) => {
+    // Filtruojame tik tą vieną kortą pagal ID
+    setMyCards((prev) => prev.filter((card) => card.id !== cardId));
   };
 
-  // Sąlyga pulsavimui: pvz., jei turi bent 3 kortas (vėliau pakeisi į 10)
   const isMadMouseReady = myCards.length >= 3;
 
   return (
-    <div className="player-hand-area">
+    <div className="player-hand-wrapper">
       <div className="hand-container">
-        <AnimatePresence>
-          {myCards.map((card, index) => (
+        <AnimatePresence mode="popLayout" initial={false}>
+          {myCards?.map((card) => (
             <motion.div
-              key={card.id}
-              layoutId={card.id}
-              initial={{ y: 150, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -250, opacity: 0, scale: 0.5, rotate: 15 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="card-wrapper"
-              style={{ zIndex: index }}
+              key={card.id} // BŪTINAI įsitikink, kad cards.json faile ID yra unikalūs (pvz. "c1", "c2")
+              layout="position" // Svarbu: neleidžia visai kortai persikrauti, tik juda vieta
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{
+                opacity: 0,
+                scale: 0.5,
+                y: -150,
+                transition: { duration: 0.2 },
+              }}
+              className="card-slot"
             >
               <Card
                 {...card}
-                type={card.type as any}
-                onClick={() => playCard(card.id)}
+                onClick={() => {
+                  // Sustabdom bet kokį kitą veiksmą, kad nereaguotų fonas
+                  setMyCards((prev) => prev.filter((c) => c.id !== card.id));
+                }}
               />
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
 
-      {/* MAD MOUSE MYGTUKAS */}
-      <div className="action-button-container">
+      {/* Mad Mouse Mygtukas */}
+      <div className="controls-area">
         <motion.button
           className={`mad-mouse-btn ${isMadMouseReady ? "active" : ""}`}
           animate={
             isMadMouseReady
               ? {
-                  scale: [1, 1.08, 1],
-                  backgroundColor: ["#FFD700", "#FFF000", "#FFD700"],
+                  scale: [1, 1.05, 1],
                   boxShadow: [
-                    "0px 0px 0px rgba(255, 215, 0, 0)",
-                    "0px 0px 25px rgba(255, 215, 0, 0.6)",
-                    "0px 0px 0px rgba(255, 215, 0, 0)",
+                    "0px 0px 0px #ffd700",
+                    "0px 0px 20px #ffd700",
+                    "0px 0px 0px #ffd700",
                   ],
                 }
-              : { scale: 1 }
+              : {}
           }
-          transition={{
-            repeat: Infinity,
-            duration: 1.5,
-            ease: "easeInOut",
-          }}
-          onClick={() => isMadMouseReady && alert("MAD MOUSE!!!")}
+          transition={{ repeat: Infinity, duration: 2 }}
         >
-          <span className="btn-text">MAD MOUSE!</span>
-          <span className="btn-count">{myCards.length}/10</span>
+          MAD MOUSE ({myCards.length}/10)
         </motion.button>
       </div>
     </div>
