@@ -13,6 +13,7 @@ import RegistrationPage from "./pages/RegistrationPage";
 import LobbyListPage from "./pages/LobbyListPage";
 import CreateRoomPage from "./pages/CreateRoomPage";
 import RoomPage from "./pages/RoomPage";
+import GamePage from "./pages/GamePage";
 
 function App() {
   const { username } = useAuthStore();
@@ -93,6 +94,8 @@ function App() {
               path="/room/:roomId"
               element={username ? <RoomPage /> : <Navigate to="/" />}
             />
+
+            <Route path="/game/:roomId" element={<GamePage />} />
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
