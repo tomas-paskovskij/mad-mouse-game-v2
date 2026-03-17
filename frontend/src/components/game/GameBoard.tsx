@@ -1,29 +1,34 @@
 import React from "react";
 import { motion } from "framer-motion";
-import ReactionTimer from "./ReactionTimer"; // Importuojame naują komponentą
-import Card from "./Card";
+import ReactionTimer from "./ReactionTimer";
 import "./GameBoard.css";
 
-const GameBoard: React.FC = () => {
+// 1. Pridedame interfeisą, kad komponentas žinotų apie onDraw prop'są
+interface GameBoardProps {
+  onDraw?: () => void;
+}
+
+const GameBoard: React.FC<GameBoardProps> = ({ onDraw }) => {
   return (
     <div className="game-board">
-      {/* Centrinė zona: Kaladė ir Išmesta korta */}
       <div className="board-center">
-        {/* LAIKMATIS: Atsiranda čia */}
         <div className="timer-wrapper">
           <ReactionTimer />
         </div>
 
         <div className="card-piles">
-          {/* Kaladė (Deck) */}
-          <div className="deck-pile">
+          {/* 2. Paverčiame į motion.div ir pridedame onClick={onDraw} */}
+          <motion.div
+            className="deck-pile"
+            onClick={onDraw}
+            whileHover={{ scale: 1.05, y: -5 }} // Vizualus feedback
+            whileTap={{ scale: 0.95 }} // Paspaudimo feedback
+          >
             <div className="card-back">MM</div>
             <span className="pile-label">Kaladė</span>
-          </div>
+          </motion.div>
 
-          {/* Išmesta korta (Discard Pile) */}
           <div className="discard-pile">
-            {/* Čia vėliau bus paskutinė išmesta korta */}
             <div className="discard-placeholder">
               <span className="pile-label">Išmesta korta</span>
             </div>

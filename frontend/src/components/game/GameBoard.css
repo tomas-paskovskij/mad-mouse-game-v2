@@ -46,16 +46,22 @@
 
 /* Kaladės (Deck) išvaizda */
 .deck-pile {
-  background: linear-gradient(135deg, #444, #222);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  box-shadow:
-    0 5px 0 #111,
-    0 10px 20px rgba(0, 0, 0, 0.5);
   cursor: pointer;
+  user-select: none; /* Neleidžia žymėti teksto/vaizdo spaudant */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  transition: transform 0.1s ease;
 }
 
 .deck-pile:hover {
-  transform: translateY(-5px);
+  transform: translateY(-5px) scale(1.02);
+  filter: brightness(1.2);
+}
+
+.deck-pile:active {
+  transform: translateY(0) scale(0.95);
 }
 
 /* Išmetimo krūvos (Discard) vieta */

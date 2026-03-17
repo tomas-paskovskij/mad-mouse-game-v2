@@ -1,15 +1,16 @@
-import React, { useState } from "react";
+import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Card from "./Card";
-import cardsData from "../../data/cards.json";
 import "./PlayerHand.css";
 
-const PlayerHand: React.FC = () => {
-  // Pradinės kortos iš JSON
-  const [myCards, setMyCards] = useState(cardsData.slice(0, 5));
+// Apibrėžiame, kokius duomenis komponentas gauna iš GamePage
+interface PlayerHandProps {
+  myCards: any[];
+  setMyCards: React.Dispatch<React.SetStateAction<any[]>>;
+}
 
+const PlayerHand: React.FC<PlayerHandProps> = ({ myCards, setMyCards }) => {
   const playCard = (cardId: string) => {
-    // Filtruojame tik tą vieną kortą pagal ID
     setMyCards((prev) => prev.filter((card) => card.id !== cardId));
   };
 
@@ -21,25 +22,35 @@ const PlayerHand: React.FC = () => {
         <AnimatePresence mode="popLayout" initial={false}>
           {myCards?.map((card) => (
             <motion.div
-              key={card.id} // BŪTINAI įsitikink, kad cards.json faile ID yra unikalūs (pvz. "c1", "c2")
-              layout="position" // Svarbu: neleidžia visai kortai persikrauti, tik juda vieta
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
+              key={card.id}
+              layout="position"
+              // Animacija: korta atskrenda iš GameBoard vietos (initial y: -400)
+              initial={{
+                opacity: 0,
+                scale: 0.3,
+                y: -400,
+                rotate: 15,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                y: 0,
+                rotate: 0,
+              }}
               exit={{
                 opacity: 0,
                 scale: 0.5,
                 y: -150,
                 transition: { duration: 0.2 },
               }}
+              transition={{
+                type: "spring",
+                stiffness: 260,
+                damping: 25,
+              }}
               className="card-slot"
             >
-              <Card
-                {...card}
-                onClick={() => {
-                  // Sustabdom bet kokį kitą veiksmą, kad nereaguotų fonas
-                  setMyCards((prev) => prev.filter((c) => c.id !== card.id));
-                }}
-              />
+              <Card {...card} onClick={() => playCard(card.id)} />
             </motion.div>
           ))}
         </AnimatePresence>
