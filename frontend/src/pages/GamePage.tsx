@@ -1,50 +1,22 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import { motion } from "framer-motion";
+import { useGameStore } from "../store/useGameStore";
 import GameBoard from "../components/game/GameBoard";
 import PlayerHand from "../components/game/PlayerHand";
 import Scoreboard from "../components/game/Scoreboard";
 import Opponents from "../components/game/Opponents";
-import cardsData from "../data/cards.json"; // Tavo kortų duomenų bazė
 import "./GamePage.css";
 
 const GamePage: React.FC = () => {
-  const [currentPlayer] = useState("Tomas");
+  // Pasiimame tik pradinio užkrovimo funkciją ir žaidėjo vardą (jei reikia)
+  const initGame = useGameStore((state) => state.initGame);
+  const currentPlayer = "Tomas"; // Galima vėliau irgi įsikelti į store
 
-  // PAGRINDINĖ BŪSENA: čia gyvena tavo rankos kortos
-  const [myCards, setMyCards] = useState<any[]>([]);
-
-  // FUNKCIJA: Kortos traukimas
-  const handleDrawCard = () => {
-    console.log("1. Mygtukas paspaustas");
-
-    if (myCards.length >= 10) {
-      console.log("Limit pasiektas");
-      return;
-    }
-
-    // Patikrinam ar cardsData apskritai egzistuoja
-    if (!cardsData || cardsData.length === 0) {
-      console.error("Klaida: cards.json tuščias arba neįkeltas!");
-      return;
-    }
-
-    const randomIndex = Math.floor(Math.random() * cardsData.length);
-    const cardTemplate = cardsData[randomIndex];
-
-    // Sukuriam visiškai naują objektą su unikaliu ID
-    const newCard = {
-      ...cardTemplate,
-      id: `card-${Date.now()}-${Math.random()}`,
-    };
-
-    console.log("2. Nauja korta sukurta:", newCard);
-
-    // SVARBU: Naudojame spread operatorių [...prev, newCard],
-    // kad React suprastų, jog tai NAUJAS masyvas
-    setMyCards((prev) => [...prev, newCard]);
-
-    console.log("3. Būsena atnaujinta");
-  };
+  // Žaidimo pradžia: išdaliname kortas tik vieną kartą užkrovus
+  useEffect(() => {
+    console.log("Žaidimas inicijuojamas..."); // Patikrinimui konsolėje
+    initGame();
+  }, []);
 
   return (
     <motion.div
@@ -68,16 +40,15 @@ const GamePage: React.FC = () => {
           <div className="turn-indicator">
             Ėjimą atlieka: <span>{currentPlayer}</span>
           </div>
-
-          {/* Perduodame traukimo funkciją į GameBoard */}
-          <GameBoard onDraw={handleDrawCard} />
+          {/* GameBoard pats pasiims drawCard iš Zustand */}
+          <GameBoard />
         </section>
       </main>
 
       {/* APAČIA: Tavo kortos */}
       <footer className="game-footer">
-        {/* Perduodame kortas ir jų valdymo funkciją */}
-        <PlayerHand myCards={myCards} setMyCards={setMyCards} />
+        {/* PlayerHand pats pasiims myCards iš Zustand */}
+        <PlayerHand />
       </footer>
     </motion.div>
   );

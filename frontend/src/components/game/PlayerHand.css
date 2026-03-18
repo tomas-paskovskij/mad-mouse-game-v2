@@ -27,7 +27,7 @@
 .card-slot {
   position: relative;
   margin: 0 -25px; /* Kortų persidengimas */
-  transition: transform 0.2s ease;
+  /* transition: transform 0.2s ease; */
   /* Svarbu: kad Framer Motion layoutId veiktų sklandžiai */
   display: inline-block;
 }
