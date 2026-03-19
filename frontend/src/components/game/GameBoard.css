@@ -1,36 +1,34 @@
 .game-board {
   display: flex;
   width: 100%;
-  height: 500px; /* Galite koreguoti pagal poreikį */
+  height: 500px;
   position: relative;
   padding: 20px;
   box-sizing: border-box;
   gap: 20px;
 }
 
-/* 3. CENTRAS: Vieta, kurioje nugula išmetamos kortos */
 .table-center {
   flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
   position: relative;
-  background: rgba(255, 255, 255, 0.03);
-  border: 2px dashed rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.02);
+  border: 2px dashed rgba(255, 255, 255, 0.05);
   border-radius: 30px;
-  overflow: visible; /* Kad kortos galėtų "skristi" iš už ribų */
+  overflow: visible;
 }
 
 .center-placeholder {
-  color: rgba(255, 255, 255, 0.1);
-  font-size: 1.5rem;
-  font-weight: bold;
+  color: rgba(255, 255, 255, 0.05);
+  font-size: 2rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 4px;
+  letter-spacing: 8px;
   pointer-events: none;
 }
 
-/* 1 ir 2. DEŠINĖ PANELĖ: Kaladės */
 .side-panel {
   width: 160px;
   display: flex;
@@ -38,10 +36,10 @@
   justify-content: center;
   align-items: center;
   gap: 40px;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 24px;
   padding: 20px;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -54,53 +52,77 @@
 }
 
 .pile-label {
-  font-size: 0.75rem;
-  color: #aaa;
+  font-size: 0.7rem;
+  color: #777;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  text-align: center;
+  letter-spacing: 2px;
+  font-weight: bold;
 }
 
-/* Kaladės (Deck) išvaizda */
+/* Dinaminė kaladė su sluoksniais */
 .deck-pile {
   width: 100px;
   height: 140px;
-  background: #2c3e50;
-  border-radius: 10px;
-  border: 2px solid #34495e;
+  background: #1e272e;
+  border-radius: 12px;
+  border: 1px solid #2f3640;
   display: flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
   position: relative;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-  transition: transform 0.2s ease;
+
+  /* Tikroviškas storio efektas per šešėlius */
+  box-shadow:
+    0 1px 0 #2f3640,
+    0 2px 0 #1e272e,
+    /* Sukuriamas sluoksnių gylis pagal kintamąjį */ 0 calc(var(--layers) * 1px)
+      0 #2f3640,
+    0 calc(var(--layers) * 1.5px + 5px) 20px rgba(0, 0, 0, 0.6);
+
+  /* Kaladė fiziškai pakyla, kai joje daug kortų */
+  transform: translateY(calc(var(--layers) * -1.2px));
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.deck-pile.empty {
+  opacity: 0.2;
+  box-shadow: none;
+  transform: none;
+  cursor: default;
 }
 
 .card-back {
-  font-weight: bold;
-  font-size: 1.5rem;
-  color: #ecf0f1;
+  font-weight: 900;
+  font-size: 1.6rem;
+  color: #3498db;
+  text-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
   user-select: none;
 }
 
-/* Tuščias rėmelis išmestai kortai (vizualus indikatorius) */
+.deck-empty-text {
+  font-size: 0.7rem;
+  color: #555;
+  text-transform: uppercase;
+}
+
 .discard-slot-visual {
   width: 100px;
   height: 140px;
-  border: 2px dashed rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  border: 2px dashed rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-.empty-slot {
-  width: 100%;
-  height: 100%;
+.empty-slot-icon {
+  font-size: 1.5rem;
+  opacity: 0.15;
 }
 
-/* Laikmačio pozicija (viršuje centre) */
 .timer-wrapper {
   position: absolute;
   top: -10px;
@@ -109,20 +131,17 @@
   z-index: 10;
 }
 
-/* Prisitaikymas mažesniems ekranams */
 @media (max-width: 768px) {
   .game-board {
     flex-direction: column;
     height: auto;
   }
-
   .side-panel {
     width: 100%;
     flex-direction: row;
     height: auto;
   }
-
   .table-center {
-    height: 300px;
+    height: 350px;
   }
 }

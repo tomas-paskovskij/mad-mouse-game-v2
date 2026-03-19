@@ -5,22 +5,28 @@ import Card from "./Card";
 import ReactionTimer from "./ReactionTimer";
 import "./GameBoard.css";
 
-// Pagalbinė funkcija gauti atsitiktinį skaičių intervale
 const getRandom = (min: number, max: number) =>
   Math.random() * (max - min) + min;
 
 const GameBoard: React.FC = () => {
-  const drawCard = useGameStore((state) => state.drawCard);
-  const discardPile = useGameStore((state) => state.discardPile);
+  const { myCards, discardPile, drawCard } = useGameStore();
+
+  // 1. Kaladės likučio logika
+  const totalCardsInDeck = 52;
+  const cardsLeft = Math.max(
+    0,
+    totalCardsInDeck - (myCards.length + discardPile.length),
+  );
+  // Vizualinis sluoksnių kiekis (max 12 sluoksnių, kad neapkrautų naršyklės)
+  const visualLayers = Math.min(Math.floor(cardsLeft / 4), 12);
 
   return (
     <div className="game-board">
-      {/* Laikmatis viršuje */}
       <div className="timer-wrapper">
         <ReactionTimer />
       </div>
 
-      {/* 3. CENTRAS: Netvarkinga išmestų kortų krūva */}
+      {/* CENTRAS: Išmestų kortų krūva */}
       <div className="table-center">
         {discardPile.length === 0 && (
           <div className="center-placeholder">Stalas</div>
@@ -28,9 +34,6 @@ const GameBoard: React.FC = () => {
 
         <AnimatePresence mode="popLayout">
           {discardPile.map((card, index) => {
-            // Sukuriame unikalius nukrypimus šiai konkrečiai kortai,
-            // bet tik vieną kartą (kai ji sukuriama), kad nemirksėtų perbraižant.
-            // Kadangi 'key' yra unikalus, Framer Motion išlaikys šias reikšmes.
             const randomRotation = getRandom(-15, 15);
             const randomX = getRandom(-15, 15);
             const randomY = getRandom(-15, 15);
@@ -40,31 +43,28 @@ const GameBoard: React.FC = () => {
                 key={card.id}
                 initial={{
                   opacity: 0,
-                  scale: 2, // Korta atskrenda "iš didelio aukščio"
+                  scale: 2,
                   y: 300,
-                  rotate: randomRotation * 2, // Pradinis pasukimas didesnis
+                  rotate: randomRotation * 2,
                 }}
                 animate={{
                   opacity: 1,
                   scale: 1,
-                  x: randomX, // Galutinis nedidelis poslinkis X
-                  y: randomY, // Galutinis nedidelis poslinkis Y
-                  rotate: randomRotation, // Galutinis nedidelis pasukimas
+                  x: randomX,
+                  y: randomY,
+                  rotate: randomRotation,
                 }}
                 transition={{
                   type: "spring",
                   stiffness: 150,
                   damping: 18,
-                  mass: 1, // Suteikia kortai "svorio" pojūtį
+                  mass: 1,
                 }}
                 style={{
                   position: "absolute",
-                  // Svarbu gyliui: vėlesnės kortos (didesnis indeksas) turi didesnį zIndex
                   zIndex: index,
-                  // Pridedame tikrovišką šešėlį
-                  boxShadow: "0 8px 20px rgba(0, 0, 0, 0.5)",
-                  borderRadius: "12px", // Kad šešėlis atitiktų kortos formą
-                  pointerEvents: "none", // Kad negalėtume netyčia paspausti apatinių kortų
+                  boxShadow: "0 8px 20px rgba(0, 0, 0, 0.4)",
+                  pointerEvents: "none",
                 }}
               >
                 <Card {...card} />
@@ -74,26 +74,30 @@ const GameBoard: React.FC = () => {
         </AnimatePresence>
       </div>
 
-      {/* 1 ir 2. DEŠINĖ: Kaladės */}
+      {/* DEŠINĖ: Kaladės ir informacija */}
       <div className="side-panel">
-        {/* Kaladė (Deck) */}
         <div className="pile-group">
-          <span className="pile-label">Kaladė</span>
+          <span className="pile-label">Kaladė ({cardsLeft})</span>
           <motion.div
-            className="deck-pile"
-            onClick={drawCard}
-            whileHover={{ scale: 1.05, y: -5 }}
-            whileTap={{ scale: 0.95 }}
+            className={`deck-pile ${cardsLeft === 0 ? "empty" : ""}`}
+            onClick={cardsLeft > 0 ? drawCard : undefined}
+            // Perduodame sluoksnių kiekį į CSS
+            style={{ "--layers": visualLayers } as React.CSSProperties}
+            whileHover={cardsLeft > 0 ? { scale: 1.05, y: -5 } : {}}
+            whileTap={cardsLeft > 0 ? { scale: 0.95 } : {}}
           >
-            <div className="card-back">MM</div>
+            {cardsLeft > 0 ? (
+              <div className="card-back">MM</div>
+            ) : (
+              <div className="deck-empty-text">Tuščia</div>
+            )}
           </motion.div>
         </div>
 
-        {/* Paskutinė išmesta (Vizualus slotas) */}
         <div className="pile-group">
-          <span className="pile-label">Krūva ({discardPile.length})</span>
+          <span className="pile-label">Išmesta ({discardPile.length})</span>
           <div className="discard-slot-visual">
-            <div className="empty-slot"></div>
+            <div className="empty-slot-icon">📥</div>
           </div>
         </div>
       </div>
