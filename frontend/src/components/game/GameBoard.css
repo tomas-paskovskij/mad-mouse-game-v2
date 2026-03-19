@@ -1,147 +1,231 @@
 .game-board {
   display: flex;
   width: 100%;
-  height: 500px;
-  position: relative;
+  height: 600px;
+  background: #0a0a0a;
   padding: 20px;
-  box-sizing: border-box;
   gap: 20px;
+  color: white;
 }
 
 .table-center {
   flex: 1;
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
-  position: relative;
-  background: rgba(255, 255, 255, 0.02);
-  border: 2px dashed rgba(255, 255, 255, 0.05);
-  border-radius: 30px;
-  overflow: visible;
-}
-
-.center-placeholder {
-  color: rgba(255, 255, 255, 0.05);
-  font-size: 2rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 8px;
-  pointer-events: none;
+  background: rgba(255, 255, 255, 0.01);
+  border-radius: 40px;
 }
 
 .side-panel {
-  width: 160px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 40px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 24px;
+  width: 180px;
+  background: #111;
+  border-radius: 20px;
   padding: 20px;
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.pile-group {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  gap: 25px;
+  border: 1px solid #222;
+}
+
+/* Mygtukas */
+.finish-turn-btn {
   width: 100%;
-}
-
-.pile-label {
-  font-size: 0.7rem;
-  color: #777;
-  text-transform: uppercase;
-  letter-spacing: 2px;
+  padding: 12px;
+  background: #1b5e20;
+  border-radius: 8px;
+  border: none;
+  color: white;
   font-weight: bold;
+  opacity: 0.3;
+  text-transform: uppercase;
 }
 
-/* Dinaminė kaladė su sluoksniais */
-.deck-pile {
+.finish-turn-btn.active {
+  opacity: 1;
+  background: #2e7d32;
+  cursor: pointer;
+}
+
+/* KALADĖ (Deck) */
+.deck-container {
+  position: relative;
   width: 100px;
   height: 140px;
-  background: #1e272e;
+}
+
+.deck-pile {
+  width: 100%;
+  height: 100%;
+  background: #2c3e50;
   border-radius: 12px;
-  border: 1px solid #2f3640;
+  border: 1px solid #34495e;
   display: flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
-  position: relative;
 
-  /* Tikroviškas storio efektas per šešėlius */
+  /* Storio efektas naudojant --layers */
   box-shadow:
-    0 1px 0 #2f3640,
-    0 2px 0 #1e272e,
-    /* Sukuriamas sluoksnių gylis pagal kintamąjį */ 0 calc(var(--layers) * 1px)
-      0 #2f3640,
-    0 calc(var(--layers) * 1.5px + 5px) 20px rgba(0, 0, 0, 0.6);
+    0 1px 0 #1a252f,
+    0 calc(var(--layers) * 1px) 0 #1a252f,
+    0 calc(var(--layers) * 2px + 10px) 20px rgba(0, 0, 0, 0.6);
 
-  /* Kaladė fiziškai pakyla, kai joje daug kortų */
+  /* Kaladė pakyla priklausomai nuo kortų kiekio */
   transform: translateY(calc(var(--layers) * -1.2px));
   transition:
     transform 0.3s ease,
     box-shadow 0.3s ease;
 }
 
-.deck-pile.empty {
-  opacity: 0.2;
-  box-shadow: none;
-  transform: none;
-  cursor: default;
+.deck-pile:active {
+  transform: translateY(0); /* Pasispaudžia žemyn traukiant */
 }
 
 .card-back {
   font-weight: 900;
-  font-size: 1.6rem;
   color: #3498db;
-  text-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+  font-size: 1.6rem;
   user-select: none;
 }
 
-.deck-empty-text {
-  font-size: 0.7rem;
-  color: #555;
-  text-transform: uppercase;
+/* Flying Card */
+.flying-card-back {
+  position: absolute;
+  inset: 0;
+  background: #34495e;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #3498db;
+  font-weight: 900;
+  font-size: 1.6rem;
+  z-index: 1;
+  pointer-events: none;
 }
 
+/* Istorija */
 .discard-slot-visual {
   width: 100px;
   height: 140px;
-  border: 2px dashed rgba(255, 255, 255, 0.05);
+  border: 2px dashed #333;
   border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+}
+
+.used-card-preview-wrapper {
+  transform: scale(0.85);
+  pointer-events: none;
+}
+
+.hover-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.7rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.discard-slot-visual:hover .hover-overlay {
+  opacity: 1;
+}
+
+/* Istorijos Grid */
+.history-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 1000;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-.empty-slot-icon {
-  font-size: 1.5rem;
-  opacity: 0.15;
+.history-content {
+  width: 80%;
+  height: 80%;
+  background: #111;
+  border-radius: 25px;
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
 }
 
-.timer-wrapper {
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 30px;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.history-card-item {
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.2s;
+}
+.history-card-item:hover {
+  transform: translateY(-5px);
+}
+
+/* Option Menu */
+.card-options-menu {
   position: absolute;
-  top: -10px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
+  background: #222;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 8px;
   z-index: 10;
 }
 
-@media (max-width: 768px) {
-  .game-board {
-    flex-direction: column;
-    height: auto;
-  }
-  .side-panel {
-    width: 100%;
-    flex-direction: row;
-    height: auto;
-  }
-  .table-center {
-    height: 350px;
-  }
+.card-options-menu button {
+  width: 100%;
+  padding: 8px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.7rem;
+}
+
+/* Zoom */
+.zoom-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.zoomed-card-box {
+  transform: scale(1.5);
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.close-btn {
+  background: #e74c3c;
+  border: none;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
 }

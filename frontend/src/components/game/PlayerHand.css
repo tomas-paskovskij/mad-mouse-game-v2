@@ -1,65 +1,80 @@
-.player-hand-wrapper {
+.player-hand-container {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100vw;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-bottom: 20px;
-  z-index: 1000;
-  pointer-events: none;
-  /* Svarbu: neleidžiam atsirasti scrollbarams animacijos metu */
-  overflow: hidden;
-}
-
-.hand-container {
+  bottom: 20px;
+  width: 100%;
   display: flex;
   justify-content: center;
-  align-items: flex-end;
-  height: 250px;
-  pointer-events: auto;
-  position: relative;
-  /* Užtikrinam, kad konteineris nesiplėstų */
-  width: 100%;
-}
-
-.card-slot {
-  position: relative;
-  margin: 0 -25px; /* Kortų persidengimas */
-  /* transition: transform 0.2s ease; */
-  /* Svarbu: kad Framer Motion layoutId veiktų sklandžiai */
-  display: inline-block;
-}
-
-/* Ši dalis sutvarko "dingimą" - korta išeidama nebestumia kitų */
-.card-slot[style*="position: absolute"] {
-  pointer-events: none;
-}
-
-.card-slot:hover {
   z-index: 100;
-  transform: translateY(-20px);
 }
 
-.controls-area {
-  margin-top: 15px;
-  pointer-events: auto;
+.player-hand {
+  display: flex;
+  gap: -20px; /* Kortos gali šiek tiek persidengti */
 }
 
-.mad-mouse-btn {
-  background: #222;
+.card-wrapper {
+  position: relative;
+  transition: transform 0.2s;
+}
+
+.card-wrapper:hover {
+  transform: translateY(-10px);
+  z-index: 10;
+}
+
+/* Meniu virš kortos */
+.card-options {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid #3498db;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  gap: 5px;
+  z-index: 20;
+  width: 100px;
+}
+
+.card-options button {
+  background: transparent;
   color: white;
-  border: 2px solid #444;
-  padding: 10px 25px;
-  border-radius: 30px;
-  font-weight: bold;
+  border: none;
+  font-size: 0.8rem;
+  padding: 8px;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  text-align: left;
+  border-radius: 4px;
 }
 
-.mad-mouse-btn.active {
-  background: #ffd700;
-  color: black;
-  border-color: #ffaa00;
+.card-options button:hover {
+  background: #3498db;
+}
+
+.burn-btn:hover {
+  background: #e74c3c !important;
+}
+
+/* Zoom efektas */
+.card-zoom-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.zoom-hint {
+  color: white;
+  margin-top: 50px;
+  font-size: 0.9rem;
+  opacity: 0.7;
 }
