@@ -3,25 +3,23 @@ import cardsData from "../data/cards.json";
 
 interface GameState {
   myCards: any[];
-  // Būtina pridėti playCard į interfeisą!
-  playCard: (cardId: string) => void;
+  discardPile: any[];
   drawCard: () => void;
+  playCard: (cardId: string) => void;
   initGame: () => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
   myCards: [],
+  discardPile: [],
 
   drawCard: () => {
     const { myCards } = get();
     if (myCards.length >= 10) return;
 
     const randomIndex = Math.floor(Math.random() * cardsData.length);
-    const cardTemplate = cardsData[randomIndex];
-
     const newCard = {
-      ...cardTemplate,
-      // Pridedame unikalesnį ID, kad React nekiltų problemų su animacijomis
+      ...cardsData[randomIndex],
       id: `card-${Date.now()}-${Math.random()}`,
     };
 
@@ -29,20 +27,20 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   playCard: (cardId: string) =>
-    set((state) => ({
-      myCards: state.myCards.filter((c) => c.id !== cardId),
-    })),
+    set((state) => {
+      const cardToPlay = state.myCards.find((c) => c.id === cardId);
+      if (!cardToPlay) return state;
+
+      return {
+        myCards: state.myCards.filter((c) => c.id !== cardId),
+        discardPile: [...state.discardPile, cardToPlay],
+      };
+    }),
 
   initGame: () => {
-    // 1. Išvalome esamas kortas
-    set({ myCards: [] });
-
-    // 2. Išdaliname 5 kortas su vėlavimu
-    // Naudojame paprastą ciklą su setTimeout
+    set({ myCards: [], discardPile: [] });
     for (let i = 0; i < 5; i++) {
-      setTimeout(() => {
-        get().drawCard();
-      }, i * 500);
+      setTimeout(() => get().drawCard(), i * 200);
     }
   },
 }));

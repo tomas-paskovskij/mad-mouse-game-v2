@@ -68,6 +68,14 @@
 .discard-pile {
   background: rgba(255, 255, 255, 0.05);
   border: 2px dashed rgba(255, 255, 255, 0.2);
+  width: 120px; /* Toks pat kaip kortos plotis */
+  height: 170px; /* Toks pat kaip kortos aukštis */
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .discard-placeholder {
