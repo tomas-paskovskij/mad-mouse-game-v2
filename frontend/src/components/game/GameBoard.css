@@ -1,105 +1,128 @@
 .game-board {
-  position: relative;
-  width: 100%;
-  height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #1a1a1a; /* Arba tavo fono spalva */
-  overflow: hidden;
+  width: 100%;
+  height: 500px; /* Galite koreguoti pagal poreikį */
+  position: relative;
+  padding: 20px;
+  box-sizing: border-box;
+  gap: 20px;
 }
 
-.board-center {
+/* 3. CENTRAS: Vieta, kurioje nugula išmetamos kortos */
+.table-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px dashed rgba(255, 255, 255, 0.07);
+  border-radius: 30px;
+  overflow: visible; /* Kad kortos galėtų "skristi" iš už ribų */
+}
+
+.center-placeholder {
+  color: rgba(255, 255, 255, 0.1);
+  font-size: 1.5rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  pointer-events: none;
+}
+
+/* 1 ir 2. DEŠINĖ PANELĖ: Kaladės */
+.side-panel {
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 40px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 20px;
+  padding: 20px;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pile-group {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 30px;
-  /* Pakeliam centrą šiek tiek į viršų, kad vizualiai būtų tarp priešininkų ir tavo rankos */
-  margin-top: -50px;
+  gap: 12px;
+  width: 100%;
 }
 
-.timer-wrapper {
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.card-piles {
-  display: flex;
-  gap: 50px; /* Tarpas tarp kaladės ir išmetimo krūvos */
-  perspective: 1000px;
-}
-
-.deck-pile,
-.discard-pile {
-  position: relative;
-  width: 120px;
-  height: 170px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.3s ease;
+.pile-label {
+  font-size: 0.75rem;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-align: center;
 }
 
 /* Kaladės (Deck) išvaizda */
 .deck-pile {
-  cursor: pointer;
-  user-select: none; /* Neleidžia žymėti teksto/vaizdo spaudant */
+  width: 100px;
+  height: 140px;
+  background: #2c3e50;
+  border-radius: 10px;
+  border: 2px solid #34495e;
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  gap: 10px;
-  transition: transform 0.1s ease;
-}
-
-.deck-pile:hover {
-  transform: translateY(-5px) scale(1.02);
-  filter: brightness(1.2);
-}
-
-.deck-pile:active {
-  transform: translateY(0) scale(0.95);
-}
-
-/* Išmetimo krūvos (Discard) vieta */
-.discard-pile {
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px dashed rgba(255, 255, 255, 0.2);
-  width: 120px; /* Toks pat kaip kortos plotis */
-  height: 170px; /* Toks pat kaip kortos aukštis */
-  border: 2px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+  cursor: pointer;
   position: relative;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  transition: transform 0.2s ease;
+}
+
+.card-back {
+  font-weight: bold;
+  font-size: 1.5rem;
+  color: #ecf0f1;
+  user-select: none;
+}
+
+/* Tuščias rėmelis išmestai kortai (vizualus indikatorius) */
+.discard-slot-visual {
+  width: 100px;
+  height: 140px;
+  border: 2px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-.discard-placeholder {
-  color: rgba(255, 255, 255, 0.2);
-  font-size: 0.8rem;
-  text-align: center;
-  text-transform: uppercase;
+.empty-slot {
+  width: 100%;
+  height: 100%;
 }
 
-.pile-label {
+/* Laikmačio pozicija (viršuje centre) */
+.timer-wrapper {
   position: absolute;
-  top: -25px;
-  font-size: 0.7rem;
-  font-weight: bold;
-  color: rgba(255, 255, 255, 0.4);
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
 }
 
-/* MM užrašas ant kaladės nugarėlės */
-.card-back {
-  font-size: 2rem;
-  font-weight: 900;
-  color: #ffca28;
-  text-shadow: 0 0 10px rgba(255, 202, 40, 0.5);
-  user-select: none;
+/* Prisitaikymas mažesniems ekranams */
+@media (max-width: 768px) {
+  .game-board {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .side-panel {
+    width: 100%;
+    flex-direction: row;
+    height: auto;
+  }
+
+  .table-center {
+    height: 300px;
+  }
 }
