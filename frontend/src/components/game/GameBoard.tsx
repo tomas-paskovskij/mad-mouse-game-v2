@@ -5,9 +5,6 @@ import Card from "./Card";
 import ReactionTimer from "./ReactionTimer";
 import "./GameBoard.css";
 
-const getRandom = (min: number, max: number) =>
-  Math.random() * (max - min) + min;
-
 const GameBoard: React.FC = () => {
   const {
     myCards,
@@ -25,7 +22,6 @@ const GameBoard: React.FC = () => {
 
   const [drawingTrigger, setDrawingTrigger] = useState(0);
 
-  // Skaičiuojame tūrį kaladei (max 12 sluoksnių)
   const totalCardsInDeck = 52;
   const cardsLeft = Math.max(
     0,
@@ -47,26 +43,37 @@ const GameBoard: React.FC = () => {
       </div>
 
       <div className="table-center">
-        <AnimatePresence mode="popLayout">
-          {discardPile.map((card, index) => (
-            <motion.div
-              key={card.id}
-              initial={{ opacity: 0, scale: 1.5, y: 200 }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-                x: index * 2,
-                y: index * -2,
-                rotate: getRandom(-5, 5),
-              }}
-              exit={{ x: 600, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              style={{ position: "absolute", zIndex: index }}
-            >
-              <Card {...card} />
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        <div className="cards-row">
+          <AnimatePresence mode="popLayout">
+            {discardPile.map((card, index) => (
+              <motion.div
+                key={card.id}
+                className={`table-card-container ${card.owner || "player"}`}
+                initial={{
+                  opacity: 0,
+                  y: card.owner === "opponent" ? -300 : 300,
+                  scale: 0.8,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                  scale: 1,
+                  rotate: index % 2 === 0 ? 2 : -2,
+                }}
+                exit={{ opacity: 0, scale: 0.5, x: 100 }}
+                transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                style={{ zIndex: index }}
+              >
+                <div className="owner-label">
+                  {card.owner === "opponent" ? "Priešininkas" : "Tu"}
+                </div>
+                <div className={`glow-wrapper ${card.owner || "player"}`}>
+                  <Card {...card} />
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
 
       <div className="side-panel">
@@ -81,13 +88,10 @@ const GameBoard: React.FC = () => {
         <div className="pile-group">
           <span className="pile-label">Kaladė ({cardsLeft})</span>
           <div className="deck-container">
-            {/* SUGRAŽINTAS 3D STILIUS PER visualLayers */}
             <motion.div
               className={`deck-pile ${cardsLeft === 0 ? "empty" : ""}`}
               onClick={handleDraw}
               style={{ "--layers": visualLayers } as React.CSSProperties}
-              whileHover={cardsLeft > 0 ? { scale: 1.05 } : {}}
-              whileTap={cardsLeft > 0 ? { scale: 0.95 } : {}}
             >
               {cardsLeft > 0 ? (
                 <div className="card-back">MM</div>
@@ -95,7 +99,6 @@ const GameBoard: React.FC = () => {
                 <div className="deck-empty-text">Pabaiga</div>
               )}
             </motion.div>
-
             <AnimatePresence>
               {drawingTrigger > 0 && (
                 <motion.div
@@ -120,7 +123,12 @@ const GameBoard: React.FC = () => {
           >
             {usedCards.length > 0 ? (
               <div className="used-card-preview-wrapper">
-                <Card {...usedCards[usedCards.length - 1]} />
+                {/* Paskutinė korta istorijoje taip pat turi savo glow */}
+                <div
+                  className={`glow-wrapper mini ${usedCards[usedCards.length - 1].owner || "player"}`}
+                >
+                  <Card {...usedCards[usedCards.length - 1]} />
+                </div>
               </div>
             ) : (
               <div className="empty-slot-icon">📥</div>
@@ -153,22 +161,21 @@ const GameBoard: React.FC = () => {
                   Uždaryti
                 </button>
               </div>
-
               <div
                 className="history-grid"
                 onClick={() => setSelectedHistoryCard(null)}
               >
                 {usedCards.map((card) => (
                   <div key={card.id} className="history-card-container">
+                    {/* PRIDĖTAS GLOW RĖMELIS ISTORIJOS GRID'E */}
                     <div
-                      className="history-card-item"
+                      className={`history-card-item glow-wrapper ${card.owner || "player"}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedHistoryCard(card.id);
                       }}
                     >
                       <Card {...card} />
-
                       <AnimatePresence>
                         {selectedHistoryCard === card.id && (
                           <motion.div
@@ -189,7 +196,6 @@ const GameBoard: React.FC = () => {
                   </div>
                 ))}
               </div>
-
               <AnimatePresence>
                 {zoomedHistoryCard && (
                   <motion.div
@@ -204,9 +210,16 @@ const GameBoard: React.FC = () => {
                       initial={{ scale: 0.5 }}
                       animate={{ scale: 1.5 }}
                     >
-                      <Card
-                        {...usedCards.find((c) => c.id === zoomedHistoryCard)}
-                      />
+                      {/* Padidinta korta su rėmeliu */}
+                      <div
+                        className={`glow-wrapper ${usedCards.find((c) => c.id === zoomedHistoryCard)?.owner || "player"}`}
+                      >
+                        <Card
+                          {...usedCards.find(
+                            (c) => c.id === zoomedHistoryCard,
+                          )!}
+                        />
+                      </div>
                     </motion.div>
                   </motion.div>
                 )}

@@ -11,7 +11,8 @@ interface CardType {
   id: string;
   suit: string;
   value: string;
-  [key: string]: any; // Dėl papildomų JSON duomenų
+  owner?: "player" | "opponent";
+  [key: string]: any;
 }
 
 interface GameState {
@@ -22,7 +23,7 @@ interface GameState {
   selectedHistoryCard: string | null;
   zoomedHistoryCard: string | null;
   drawCard: () => void;
-  playCard: (cardId: string) => void;
+  playCard: (cardId: string, owner?: "player" | "opponent") => void;
   burnCard: (cardId: string) => void;
   finishTurn: () => void;
   initGame: () => void;
@@ -51,14 +52,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ myCards: [...myCards, newCard] });
   },
 
-  playCard: (cardId: string) => {
+  playCard: (cardId: string, owner = "player") => {
     const { myCards, discardPile } = get();
     const cardToPlay = myCards.find((c) => c.id === cardId);
     if (!cardToPlay) return;
     playSound("play.mp3");
     set({
       myCards: myCards.filter((c) => c.id !== cardId),
-      discardPile: [...discardPile, cardToPlay],
+      discardPile: [...discardPile, { ...cardToPlay, owner }],
     });
   },
 
