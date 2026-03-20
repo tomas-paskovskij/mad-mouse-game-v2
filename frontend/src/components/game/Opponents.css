@@ -1,0 +1,16 @@
+.opponent-card {
+  background: rgba(26, 31, 43, 0.9);
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 1px solid #3d4455;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+  min-width: 150px;
+}
+
+.opponent-card.is-me {
+  border-color: #f1c40f; /* Auksinis rėmelis tau */
+  box-shadow: 0 0 15px rgba(241, 196, 15, 0.3);
+}

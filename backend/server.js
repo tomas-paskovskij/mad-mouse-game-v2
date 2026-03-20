@@ -157,6 +157,85 @@ io.on("connection", (socket) => {
     }
   });
 
+  //game Logic events
+
+  // NAUJAS: Kai žaidėjas išmeta kortą
+  socket.on("play_card", (data) => {
+    const { roomId, card } = data;
+    const room = rooms.find((r) => r.id === roomId);
+
+    if (room) {
+      const player = room.players.find((p) => p.id === socket.id);
+      if (player && player.cardCount > 0) {
+        player.cardCount -= 1; // Sumažiname kortų skaičių serveryje
+      }
+
+      // Siunčiame visiems informaciją apie išmestą kortą ir atnaujintą žaidėjų būseną
+      io.to(roomId).emit("card_played_broadcast", {
+        card: card,
+        senderId: socket.id,
+        players: room.players, // Siunčiame, kad visi pamatytų pasikeitusį skaičių viršuje
+      });
+    }
+  });
+
+  // NAUJAS: Kai žaidėjas pasigriebia kortą
+  socket.on("draw_card", (roomId) => {
+    const room = rooms.find((r) => r.id === roomId);
+    if (room) {
+      const player = room.players.find((p) => p.id === socket.id);
+      if (player) {
+        player.cardCount += 1;
+        io.to(roomId).emit("room_data_update", room); // Atnaujiname skaitliukus viršuje
+      }
+    }
+  });
+
+  socket.on("join_game_room", (data) => {
+    const { roomId, username } = data;
+    let room = rooms.find((r) => r.id === roomId);
+
+    // Jei kambario nėra, sukuriam jį (kad neužlūžtų testuojant tiesiogiai per URL)
+    if (!room) {
+      room = {
+        id: roomId,
+        name: "Žaidimas",
+        host: username,
+        players: [],
+        maxPlayers: 4,
+      };
+      rooms.push(room);
+    }
+
+    // Tikriname ar žaidėjas jau yra (pagal socket.id)
+    const playerExists = room.players.find((p) => p.id === socket.id);
+
+    if (!playerExists) {
+      room.players.push({
+        id: socket.id,
+        username: username || "Žaidėjas",
+        cardCount: 0, // Pradžioje 0, kol nepaspaustas Start
+        isReady: true,
+      });
+    }
+
+    socket.join(roomId);
+    console.log(`Žaidėjas ${username} įėjo į ŽAIDIMO kambarį: ${roomId}`);
+
+    emitRoomUpdate(roomId);
+  });
+
+  // Kai paspaudžiamas START
+  socket.on("start_game", (roomId) => {
+    const room = rooms.find((r) => r.id === roomId);
+    if (room) {
+      // Visiems priskiriame po 5 kortas vizualui
+      room.players.forEach((p) => (p.cardCount = 5));
+      io.to(roomId).emit("game_init_broadcast", { players: room.players });
+      emitRoomUpdate(roomId);
+    }
+  });
+
   socket.on("disconnect", () => {
     handlePlayerExit(socket.id);
     console.log("User disconnected:", socket.id);
