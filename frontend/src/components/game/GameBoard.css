@@ -178,6 +178,7 @@
   position: relative;
   width: 100px;
   height: 140px;
+  margin-top: 30px;
 }
 
 .deck-pile {
@@ -357,3 +358,18 @@
 .stacked-card-layer .card {
   transform: scale(0.8); /* Sumažiname, kad tilptų į šoninį panelį */
 }
+/*
+.player-hand {
+  display: flex;
+  justify-content: center;
+  position: fixed;
+  bottom: 20px;
+  width: 100%;
+  pointer-events: none; 
+}
+.hand-card-wrapper {
+  pointer-events: auto; 
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+*/

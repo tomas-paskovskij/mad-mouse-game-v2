@@ -6,6 +6,7 @@ interface CardType {
   id: string;
   suit: string;
   value: string;
+  instanceId?: string; // Svarbu: serveris naudoja instanceId
   owner?: "player" | "opponent";
 }
 
@@ -13,7 +14,7 @@ interface CardType {
 interface Player {
   id: string;
   username: string;
-  cardCount: number;
+  cards: string[];
   isReady: boolean;
 }
 
@@ -23,6 +24,7 @@ interface GameState {
   opponents: Player[];
   isGameStarted: boolean;
   myCards: CardType[];
+  deckCount: number;
   discardPile: CardType[];
   usedCards: CardType[];
   isHistoryOpen: boolean;
@@ -31,12 +33,13 @@ interface GameState {
 
   connectToRoom: (roomId: string) => void;
   sendStartSignal: () => void;
-  drawCard: (isInitial?: boolean) => void;
+  drawCard: () => void;
   playCard: (
     cardId: string,
     owner?: "player" | "opponent",
     remoteCard?: CardType,
   ) => void;
+
   finishTurn: () => void;
   initGame: () => void;
   setHistoryOpen: (open: boolean) => void;
@@ -50,6 +53,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   opponents: [],
   isGameStarted: false,
   myCards: [],
+  deckCount: 0,
   discardPile: [],
   usedCards: [],
   isHistoryOpen: false,
@@ -88,6 +92,34 @@ export const useGameStore = create<GameState>((set, get) => ({
         set({ opponents: room.players });
       });
 
+      socket.on("deck_count_update", (count: number) => {
+        console.log("Gavau naują kortų kiekį:", count); // Patikrinimui
+        set({ deckCount: count }); // Įrašome į Zustand būseną
+      });
+
+      socket.on("receive_card", (card: any) => {
+        console.log("Gavau kortą iš serverio:", card);
+        // Naudojame instanceId kaip unikalų ID, kad React nesidubliuotų
+        const newCard = { ...card, id: card.instanceId || card.id };
+        set((state) => ({
+          myCards: [...state.myCards, newCard],
+        }));
+      });
+
+      socket.on("card_played_broadcast", (data: any) => {
+        const { card, senderId } = data;
+        const currentSocket = get().socket;
+
+        // Jei kortą išmetė KAS NORS KITAS (ne aš pati/pats)
+        if (currentSocket && senderId !== currentSocket.id) {
+          console.log("Oponentas išmetė kortą:", card);
+
+          // Iškviečiame playCard su owner="opponent"
+          // Tai pridės kortą į discardPile, bet neatims iš tavo myCards
+          get().playCard(card.id, "opponent", card);
+        }
+      });
+
       socket.on("game_init_broadcast", (data: any) => {
         set({ isGameStarted: true });
         get().initGame();
@@ -108,22 +140,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  drawCard: (isInitial = false) => {
-    const { myCards, socket, roomId } = get();
-    if (myCards.length >= 10) return;
-
-    const randomIndex = Math.floor(Math.random() * cardsData.length);
-    const newCard = {
-      ...cardsData[randomIndex],
-      id: `card-${Date.now()}-${Math.random()}`,
-    };
-
-    set({ myCards: [...myCards, newCard] });
-
-    // Jei traukiame kortą žaidimo metu (ne pradinį dalinimą), pranešame serveriui
-    if (!isInitial && socket && roomId) {
+  drawCard: () => {
+    const { socket, roomId } = get();
+    if (socket && roomId) {
+      // Tik siunčiame užklausą. Kortos čia nepridedame!
       socket.emit("draw_card", roomId);
     }
+
+    console.log("draw");
   },
 
   playCard: (cardId, owner = "player", remoteCard) => {
@@ -165,9 +189,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       isHistoryOpen: false,
     });
     // Išdaliname po 5 kortas (perduodame true, kad nesiųstų draw_card įvykio 5 kartus)
-    for (let i = 0; i < 5; i++) {
-      setTimeout(() => get().drawCard(true), i * 150);
-    }
+    // for (let i = 0; i < 5; i++) {
+    //   setTimeout(() => get().drawCard(true), i * 150);
+    // }
   },
 
   setHistoryOpen: (open) => set({ isHistoryOpen: open }),

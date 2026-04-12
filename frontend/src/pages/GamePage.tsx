@@ -31,9 +31,9 @@ const GamePage: React.FC = () => {
 
       <main className="game-main-layout">
         {/* KAIRĖ: Rezultatai */}
-        <aside className="game-sidebar">
+        {/* <aside className="game-sidebar">
           <Scoreboard />
-        </aside>
+        </aside> */}
 
         {/* VIDURYS: Stalas */}
         <section className="game-center">

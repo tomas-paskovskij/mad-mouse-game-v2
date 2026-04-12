@@ -4,6 +4,8 @@ const { Server } = require("socket.io");
 const { instrument } = require("@socket.io/admin-ui");
 const cors = require("cors");
 
+const cardsData = require("./data/cards.json");
+
 const app = express();
 app.use(cors());
 
@@ -62,7 +64,9 @@ io.on("connection", (socket) => {
       id: Math.random().toString(36).substring(7),
       name: data.name,
       host: data.host,
-      players: [{ id: socket.id, username: data.host, isReady: false }],
+      players: [
+        { id: socket.id, username: data.host, cards: [], isReady: false },
+      ],
       maxPlayers: parseInt(data.maxPlayers) || 4,
       password: data.password || null,
     };
@@ -98,7 +102,12 @@ io.on("connection", (socket) => {
       if (room.players.length >= room.maxPlayers) {
         return socket.emit("error_message", "Room is full!");
       }
-      room.players.push({ id: socket.id, username: username, isReady: false });
+      room.players.push({
+        id: socket.id,
+        username: username,
+        cards: [],
+        isReady: false,
+      });
     } else {
       isAlreadyIn.id = socket.id;
     }
@@ -166,28 +175,66 @@ io.on("connection", (socket) => {
 
     if (room) {
       const player = room.players.find((p) => p.id === socket.id);
-      if (player && player.cardCount > 0) {
-        player.cardCount -= 1; // Sumažiname kortų skaičių serveryje
+      if (player && player.cards) {
+        // Pašaliname ID iš žaidėjo rankų
+        player.cards = player.cards.filter((id) => id !== card.instanceId);
       }
+
+      const cardWithSender = {
+        ...card,
+        senderId: socket.id,
+      };
 
       // Siunčiame visiems informaciją apie išmestą kortą ir atnaujintą žaidėjų būseną
       io.to(roomId).emit("card_played_broadcast", {
-        card: card,
+        card: cardWithSender,
         senderId: socket.id,
         players: room.players, // Siunčiame, kad visi pamatytų pasikeitusį skaičių viršuje
       });
     }
   });
 
+  function createDeck() {
+    let fullDeck = [];
+
+    // Sukuriame po 6 kiekvienos kortos kopijas, kad iš viso būtų 42 kortos
+    cardsData.forEach((cardTemplate) => {
+      for (let i = 0; i < 6; i++) {
+        fullDeck.push({
+          ...cardTemplate,
+          // Svarbu: kiekviena korta gauna unikalų instancijos ID
+          instanceId: `${cardTemplate.id}-${Math.random().toString(36).substr(2, 5)}`,
+        });
+      }
+    });
+
+    // Sumaišome (Fisher-Yates shuffle analogas)
+    return fullDeck.sort(() => Math.random() - 0.5);
+  }
+
   // NAUJAS: Kai žaidėjas pasigriebia kortą
   socket.on("draw_card", (roomId) => {
     const room = rooms.find((r) => r.id === roomId);
-    if (room) {
+    if (room && room.deck && room.deck.length > 0) {
       const player = room.players.find((p) => p.id === socket.id);
       if (player) {
-        player.cardCount += 1;
-        io.to(roomId).emit("room_data_update", room); // Atnaujiname skaitliukus viršuje
+        const card = room.deck.pop(); // Paimame kortą iš bendros kaladės
+
+        if (!player.cards) player.cards = []; // Apsauga, jei masyvo nėra
+        player.cards.push(card.instanceId);
+        console.log(player);
+
+        // 1. Tik tam žaidėjui išsiunčiame jo kortą
+        socket.emit("receive_card", card);
+
+        // 2. Visiems kambaryje atnaujiname likusį kaladės skaičių
+        io.to(roomId).emit("deck_count_update", room.deck.length);
+
+        // 3. Atnaujiname oponentų sąrašą (kad matytųsi cardCount pokytis)
+        emitRoomUpdate(roomId);
       }
+    } else {
+      socket.emit("error_message", "Kaladė tuščia!");
     }
   });
 
@@ -214,7 +261,7 @@ io.on("connection", (socket) => {
       room.players.push({
         id: socket.id,
         username: username || "Žaidėjas",
-        cardCount: 0, // Pradžioje 0, kol nepaspaustas Start
+        cards: [], // Pradžioje 0, kol nepaspaustas Start
         isReady: true,
       });
     }
@@ -228,11 +275,33 @@ io.on("connection", (socket) => {
   // Kai paspaudžiamas START
   socket.on("start_game", (roomId) => {
     const room = rooms.find((r) => r.id === roomId);
+
     if (room) {
-      // Visiems priskiriame po 5 kortas vizualui
-      room.players.forEach((p) => (p.cardCount = 5));
+      console.log("Generuojama kaladė kambariui:", roomId);
+
+      // 1. Sukuriame kaladę (tavo funkcija createDeck() jau egzistuoja)
+      room.deck = createDeck();
+
+      // 2. Išvalome visų žaidėjų kortas (jei tai naujas raundas)
+      room.players.forEach((p) => {
+        p.cards = [];
+      });
+
+      // 3. Informuojame visus žaidėjus, kad žaidimas prasidėjo
+      // Tai aktyvuos isGameStarted: true pas visus klientus
       io.to(roomId).emit("game_init_broadcast", { players: room.players });
+
+      // 4. Išsiunčiame pradinį kaladės skaičių (pvz., 42)
+      io.to(roomId).emit("deck_count_update", room.deck.length);
+
+      // 5. Atnaujiname kambarį visiems (oponentų sąrašą ir t.t.)
       emitRoomUpdate(roomId);
+
+      console.log(
+        `Žaidimas prasidėjo. Kaladėje yra ${room.deck.length} kortos.`,
+      );
+    } else {
+      console.log("Klaida: Kambarys nerastas!");
     }
   });
 
