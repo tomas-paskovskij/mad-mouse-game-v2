@@ -1,65 +1,131 @@
-/* src/components/game/Card.css */
 .card {
-  width: 140px;
-  height: 200px;
-  border-radius: 12px;
+  width: 120px;
+  height: 180px;
+  border-radius: 14px;
   cursor: pointer;
-  perspective: 1000px; /* Reikia 3D efektams */
   position: relative;
   overflow: hidden;
-  transition: box-shadow 0.3s ease;
-  user-select: none; /* Neleidžia žymėti teksto */
-}
-
-/* Spalvų schemos */
-.card.action {
-  background-color: #2196f3;
-  color: white;
-  border: 4px solid #1976d2;
-} /* Mėlyna */
-.card.counter {
-  background-color: #f44336;
-  color: white;
-  border: 4px solid #d32f2f;
-} /* Raudona */
-.card.trap {
-  background-color: #ff9800;
-  color: white;
-  border: 4px solid #f57c00;
-} /* Oranžinė */
-
-.card.back {
-  background-color: #333;
-  color: #ffd700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 2em;
-  border: 4px solid #555;
-}
-
-.card-content {
-  padding: 10px;
+  user-select: none;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  padding: 12px 10px 10px;
+  border: 1.5px solid;
+  flex-shrink: 0;
 }
 
-.card-header {
-  border-bottom: 2px solid rgba(255, 255, 255, 0.3);
-  padding-bottom: 5px;
-  margin-bottom: 5px;
+.card--action {
+  background: #e6f1fb;
+  border-color: #85b7eb;
+}
+.card--counter {
+  background: #fcebeb;
+  border-color: #f09595;
+}
+.card--trap {
+  background: #faeeda;
+  border-color: #ef9f27;
+}
+
+.card__top {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
 }
 
-.card-title {
-  font-weight: bold;
-  font-size: 1.1em;
+.card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.card--action .card__dot {
+  background: #185fa5;
+}
+.card--counter .card__dot {
+  background: #a32d2d;
+}
+.card--trap .card__dot {
+  background: #854f0b;
 }
 
-.card-description {
-  font-size: 0.9em;
-  margin: 0;
+.card__lightning {
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #eaf3de;
+  color: #27500a;
+  border: 0.5px solid #97c459;
+  font-style: normal;
+}
+
+.card__icon {
+  font-size: 22px;
+  line-height: 1;
+  margin: 4px 0 8px;
+}
+
+.card__title {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+.card--action .card__title {
+  color: #0c447c;
+}
+.card--counter .card__title {
+  color: #791f1f;
+}
+.card--trap .card__title {
+  color: #633806;
+}
+
+.card__desc {
+  font-size: 10px;
+  line-height: 1.45;
+  flex: 1;
+}
+.card--action .card__desc {
+  color: #185fa5;
+}
+.card--counter .card__desc {
+  color: #a32d2d;
+}
+.card--trap .card__desc {
+  color: #854f0b;
+}
+
+.card__bottom {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px solid;
+  display: flex;
+  justify-content: flex-end;
+}
+.card--action .card__bottom {
+  border-color: #85b7eb;
+}
+.card--counter .card__bottom {
+  border-color: #f09595;
+}
+.card--trap .card__bottom {
+  border-color: #ef9f27;
+}
+
+.card__type-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.card--action .card__type-label {
+  color: #185fa5;
+}
+.card--counter .card__type-label {
+  color: #a32d2d;
+}
+.card--trap .card__type-label {
+  color: #854f0b;
 }

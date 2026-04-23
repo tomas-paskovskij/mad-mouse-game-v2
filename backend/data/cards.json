@@ -2,43 +2,129 @@
   {
     "id": "a1",
     "type": "action",
-    "title": "Sūrio Vagis",
-    "description": "Pavok po 1 kortą iš visų žaidėjų."
+    "title": "Sūrio vagis",
+    "description": "Pavok 1 atsitiktinę kortą iš pasirinkto žaidėjo.",
+    "effect": "steal_random_card",
+    "requiresTarget": true
   },
   {
     "id": "a2",
     "type": "action",
     "title": "Chaosas",
-    "description": "Visi žaidėjai sumaišo savo kortas ir padalina jas iš naujo."
+    "description": "Surenka visų žaidėjų kortas, sumaišo ir padalina iš naujo po lygiai.",
+    "effect": "shuffle_redistribute",
+    "requiresTarget": false
   },
   {
     "id": "a3",
     "type": "action",
     "title": "Mainai",
-    "description": "Pasikeisk kortomis su pasirinktu žaidėju."
+    "description": "Apsikeisk visomis kortomis su pasirinktu žaidėju.",
+    "effect": "swap_hands",
+    "requiresTarget": true
+  },
+  {
+    "id": "a4",
+    "type": "action",
+    "title": "Dovanojimas",
+    "description": "Atiduok pasirinktą savo kortą bet kuriam žaidėjui.",
+    "effect": "give_card",
+    "requiresTarget": true,
+    "requiresCardSelection": true
+  },
+  {
+    "id": "a5",
+    "type": "action",
+    "title": "Dviguba porcija",
+    "description": "Trauk 2 kortas vietoj 1 šį ėjimą.",
+    "effect": "draw_two",
+    "requiresTarget": false
+  },
+  {
+    "id": "a6",
+    "type": "action",
+    "title": "Praleisk ėjimą",
+    "description": "Pasirinktas žaidėjas praleidžia kitą savo ėjimą.",
+    "effect": "skip_turn",
+    "requiresTarget": true
+  },
+  {
+    "id": "a7",
+    "type": "action",
+    "title": "Inspekcija",
+    "description": "Pamatyk visas pasirinkto žaidėjo kortas (tik tau matomos).",
+    "effect": "inspect_hand",
+    "requiresTarget": true
+  },
+  {
+    "id": "a8",
+    "type": "action",
+    "title": "Pelės uodega",
+    "description": "Pasirinktas žaidėjas privalo iš karto patraukti 2 kortas.",
+    "effect": "force_draw_two",
+    "requiresTarget": true
+  },
+  {
+    "id": "a9",
+    "type": "action",
+    "title": "Apsimetėlis",
+    "description": "Pakeisk vienos savo kortos tipą į bet kurį kitą šiam ėjimui.",
+    "effect": "change_card_type",
+    "requiresTarget": false,
+    "requiresCardSelection": true
   },
   {
     "id": "c1",
     "type": "counter",
     "title": "STOP!",
-    "description": "Atšauk bet kokį ką tik padėtą veiksmą."
+    "description": "Atšauk bet kokį ką tik padėtą veiksmą.",
+    "effect": "cancel_action",
+    "isLightning": true,
+    "requiresTarget": false
   },
   {
     "id": "c2",
     "type": "counter",
     "title": "Atgal tau",
-    "description": "Nukreipk veiksmą į tą, kuris jį paleido."
+    "description": "Nukreipk veiksmą į tą, kuris jį paleido.",
+    "effect": "reflect_action",
+    "isLightning": true,
+    "requiresTarget": false
+  },
+  {
+    "id": "c3",
+    "type": "counter",
+    "title": "Skydas",
+    "description": "Apsaugok save nuo bet kokio veiksmo šį ėjimą.",
+    "effect": "shield",
+    "isLightning": true,
+    "requiresTarget": false
   },
   {
     "id": "t1",
     "type": "trap",
     "title": "Pelėkautai",
-    "description": "Jei kas nors bando pavogti tavo kortą, jie praranda 2 savo kortas."
+    "description": "Jei kas nors bando vogti tavo kortą — jie praranda 2 kortas.",
+    "effect": "trap_steal",
+    "trigger": "on_steal_target",
+    "requiresTarget": false
   },
   {
     "id": "t2",
     "type": "trap",
-    "title": "Nutilk",
-    "description": "Kas pirmas prabils, turi išmesti visas kortas."
+    "title": "Spąstai",
+    "description": "Padėk ant stalo. Aktyvavęs savo ėjime — pasirinktas žaidėjas praranda 1 kortą.",
+    "effect": "trap_lose_card",
+    "trigger": "manual_activate",
+    "requiresTarget": true
+  },
+  {
+    "id": "t3",
+    "type": "trap",
+    "title": "Atspindys",
+    "description": "Automatiškai atspindi pirmą veiksmą, nukreiptą į tave.",
+    "effect": "trap_reflect",
+    "trigger": "on_any_action_target",
+    "requiresTarget": false
   }
 ]
