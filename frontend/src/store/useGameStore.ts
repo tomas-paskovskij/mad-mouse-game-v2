@@ -1,200 +1,248 @@
 import { create } from "zustand";
-import cardsData from "../data/cards.json";
-import { io, Socket } from "socket.io-client";
+import { socket } from "../services/socket";
 
-interface CardType {
+export interface CardType {
+  instanceId: string;
   id: string;
-  suit: string;
-  value: string;
-  instanceId?: string; // Svarbu: serveris naudoja instanceId
-  owner?: "player" | "opponent";
+  type: "action" | "trap" | "response" | "curse";
+  title: string;
+  description: string;
+  effect: string;
+  isLightning?: boolean;
+  requiresTarget?: boolean;
+  requiresCardSelection?: boolean;
+  trigger?: string;
+  duration?: number;
+  count?: number;
+  hidden?: boolean;
 }
 
-// Atnaujinta: pridėtas cardCount ir username, kad atitiktų serverio siunčiamus duomenis
-interface Player {
+export interface TableCard {
+  id: string;
+  card: CardType;
+  ownerId: string;
+  ownerName: string;
+  placedAt: number;
+  turnsLeft: number | null;
+  canActivate?: boolean;
+}
+
+export interface OpponentInfo {
   id: string;
   username: string;
-  cards: string[];
-  isReady: boolean;
+  cardCount: number;
+  curses: any[];
+  isConnected: boolean;
+  madMousePending: boolean;
 }
 
-interface GameState {
-  socket: Socket | null;
+interface PendingAction {
+  card: CardType;
+  initiatorId: string;
+}
+
+interface GameStore {
   roomId: string | null;
-  opponents: Player[];
-  isGameStarted: boolean;
+  mySocketId: string | null;
+
   myCards: CardType[];
+  opponents: OpponentInfo[];
+  currentTurnPlayerId: string | null;
   deckCount: number;
   discardPile: CardType[];
-  usedCards: CardType[];
-  isHistoryOpen: boolean;
-  selectedHistoryCard: string | null;
-  zoomedHistoryCard: string | null;
+  tableCards: TableCard[];
+  pendingAction: PendingAction | null;
+  winner: string | null;
+  turnNumber: number;
+  handLimit: number;
+  phase: string;
+  actionUsed: boolean;
+  madMousePlayerId: string | null;
 
-  connectToRoom: (roomId: string) => void;
-  sendStartSignal: () => void;
-  drawCard: () => void;
+  notification: { message: string; type: string } | null;
+  inspectResult: { targetUsername: string; cards: CardType[] } | null;
+  inspectStealResult: {
+    targetId: string;
+    targetUsername: string;
+    cards: CardType[];
+  } | null;
+  actionNeedsTarget: { card: CardType; initiatorId: string } | null;
+
+  initGame: (roomId: string) => void;
   playCard: (
-    cardId: string,
-    owner?: "player" | "opponent",
-    remoteCard?: CardType,
+    cardInstanceId: string,
+    targetId?: string,
+    extraData?: any,
   ) => void;
-
-  finishTurn: () => void;
-  initGame: () => void;
-  setHistoryOpen: (open: boolean) => void;
-  setSelectedHistoryCard: (cardId: string | null) => void;
-  setZoomedHistoryCard: (cardId: string | null) => void;
+  selectTarget: (targetId: string, extraData?: any) => void;
+  activateTrap: (tableCardId: string, targetId?: string) => void;
+  inspectStealPick: (targetId: string, cardInstanceId: string) => void;
+  drawCard: () => void;
+  endTurn: () => void;
+  declareMadMouse: () => void;
+  mulligan: () => void;
+  restartGame: () => void;
+  clearInspect: () => void;
+  clearInspectSteal: () => void;
+  clearActionNeedsTarget: () => void;
 }
 
-export const useGameStore = create<GameState>((set, get) => ({
-  socket: null,
-  roomId: null,
-  opponents: [],
-  isGameStarted: false,
-  myCards: [],
-  deckCount: 0,
-  discardPile: [],
-  usedCards: [],
-  isHistoryOpen: false,
-  selectedHistoryCard: null,
-  zoomedHistoryCard: null,
+function playSound(name: string) {
+  try {
+    const a = new Audio(`/sounds/${name}.mp3`);
+    a.volume = 0.4;
+    a.play().catch(() => {});
+  } catch {}
+}
 
-  connectToRoom: (roomId: string) => {
-    const currentSocket = get().socket;
+export const useGameStore = create<GameStore>((set, get) => {
+  socket.on("game_state_update", (state: any) => {
+    set({
+      myCards: state.myCards || [],
+      opponents: state.opponents || [],
+      currentTurnPlayerId: state.currentTurnPlayerId,
+      deckCount: state.deckCount,
+      discardPile: state.discardPile || [],
+      tableCards: state.tableCards || [],
+      pendingAction: state.pendingAction,
+      winner: state.winner,
+      turnNumber: state.turnNumber || 0,
+      handLimit: state.handLimit || 10,
+      phase: state.phase || "playing",
+      actionUsed: state.actionUsed || false,
+      madMousePlayerId: state.madMousePlayerId || null,
+    });
+  });
 
-    // 1. Sukuriame arba paimame esamą socket
-    const socket = currentSocket || io("http://localhost:3000");
+  socket.on("game_notification", (data: { message: string; type: string }) => {
+    set({ notification: data });
+    if (data.type === "action") playSound("play");
+    if (data.type === "trap") playSound("trap");
+    if (data.type === "turn") playSound("turn");
+    if (data.type === "mad_mouse") playSound("win");
+    setTimeout(() => set({ notification: null }), 3500);
+  });
 
-    // 2. Ištraukiame švarų username iš JSON struktūros
-    const rawData = localStorage.getItem("auth-storage");
-    let finalUsername = "Žaidėjas";
+  socket.on("receive_card", () => {
+    playSound("draw");
+  });
+  socket.on("starting_cards", () => {
+    playSound("draw");
+  });
 
-    if (rawData) {
-      try {
-        const parsed = JSON.parse(rawData);
-        // Pagal tavo nuotrauką: { "state": { "username": "www" } }
-        finalUsername = parsed.state?.username || "Žaidėjas";
-      } catch (e) {
-        console.error("Klaida nuskaitant auth-storage:", e);
-      }
-    }
+  socket.on("inspect_result", (data: any) => {
+    set({ inspectResult: data });
+  });
+  socket.on("inspect_steal_choose", (data: any) => {
+    set({ inspectStealResult: data });
+  });
+  socket.on("action_needs_target", (data: any) => {
+    set({ actionNeedsTarget: data });
+  });
+  socket.on("game_over", (data: { winner: string }) => {
+    set({ winner: data.winner });
+    playSound("win");
+  });
+  socket.on("game_restarted", () => {
+    const { roomId } = get();
+    if (roomId) window.location.href = `/room/${roomId}`;
+  });
+  socket.on("error_message", (msg: string) => {
+    alert(msg);
+  });
 
-    // console.log("Jungiamasi kaip:", finalUsername);
+  return {
+    roomId: null,
+    mySocketId: null,
+    myCards: [],
+    opponents: [],
+    currentTurnPlayerId: null,
+    deckCount: 0,
+    discardPile: [],
+    tableCards: [],
+    pendingAction: null,
+    winner: null,
+    turnNumber: 0,
+    handLimit: 10,
+    phase: "playing",
+    actionUsed: false,
+    madMousePlayerId: null,
+    notification: null,
+    inspectResult: null,
+    inspectStealResult: null,
+    actionNeedsTarget: null,
 
-    if (!currentSocket) {
-      // Klausomės kambarinių duomenų atnaujinimo
-      socket.on("room_data_update", (room: any) => {
-        // console.log("Gauti nauji kambario duomenys:", room.players);
-        // Filtruojame oponentus (kad nematytum savęs sąraše)
-        // set({ opponents: room.players.filter((p: any) => p.id !== socket.id) });
-
-        set({ opponents: room.players });
-      });
-
-      socket.on("deck_count_update", (count: number) => {
-        console.log("Gavau naują kortų kiekį:", count); // Patikrinimui
-        set({ deckCount: count }); // Įrašome į Zustand būseną
-      });
-
-      socket.on("receive_card", (card: any) => {
-        console.log("Gavau kortą iš serverio:", card);
-        // Naudojame instanceId kaip unikalų ID, kad React nesidubliuotų
-        const newCard = { ...card, id: card.instanceId || card.id };
-        set((state) => ({
-          myCards: [...state.myCards, newCard],
-        }));
-      });
-
-      socket.on("card_played_broadcast", (data: any) => {
-        const { card, senderId } = data;
-        const currentSocket = get().socket;
-
-        // Jei kortą išmetė KAS NORS KITAS (ne aš pati/pats)
-        if (currentSocket && senderId !== currentSocket.id) {
-          console.log("Oponentas išmetė kortą:", card);
-
-          // Iškviečiame playCard su owner="opponent"
-          // Tai pridės kortą į discardPile, bet neatims iš tavo myCards
-          get().playCard(card.id, "opponent", card);
+    initGame: (roomId: string) => {
+      set({ roomId, mySocketId: socket.id });
+      const username = (() => {
+        try {
+          return (
+            JSON.parse(localStorage.getItem("auth-storage") || "{}").state
+              ?.username || ""
+          );
+        } catch {
+          return "";
         }
-      });
+      })();
+      socket.emit("join_game_room", { roomId, username });
+    },
 
-      socket.on("game_init_broadcast", (data: any) => {
-        set({ isGameStarted: true });
-        get().initGame();
-      });
+    playCard: (cardInstanceId, targetId, extraData) => {
+      const { roomId } = get();
+      if (roomId)
+        socket.emit("play_card", {
+          roomId,
+          cardInstanceId,
+          targetId,
+          extraData,
+        });
+    },
 
-      set({ socket });
-    }
-
-    // 3. Siunčiame ištrauktą vardą serveriui
-    socket.emit("join_game_room", { roomId, username: finalUsername });
-    set({ roomId });
-  },
-
-  sendStartSignal: () => {
-    const { socket, roomId } = get();
-    if (socket && roomId) {
-      socket.emit("start_game", roomId);
-    }
-  },
-
-  drawCard: () => {
-    const { socket, roomId } = get();
-    if (socket && roomId) {
-      // Tik siunčiame užklausą. Kortos čia nepridedame!
-      socket.emit("draw_card", roomId);
-    }
-
-    console.log("draw");
-  },
-
-  playCard: (cardId, owner = "player", remoteCard) => {
-    const { myCards, discardPile, socket, roomId } = get();
-    let cardToPlay: CardType | undefined;
-
-    if (owner === "player") {
-      cardToPlay = myCards.find((c) => c.id === cardId);
-      if (cardToPlay && socket && roomId) {
-        socket.emit("play_card", { roomId, card: cardToPlay });
+    selectTarget: (targetId, extraData) => {
+      const { roomId } = get();
+      if (roomId) {
+        socket.emit("select_target", { roomId, targetId, extraData });
+        set({ actionNeedsTarget: null });
       }
-    } else {
-      cardToPlay = remoteCard;
-    }
+    },
 
-    if (!cardToPlay) return;
+    activateTrap: (tableCardId, targetId) => {
+      const { roomId } = get();
+      if (roomId)
+        socket.emit("activate_trap", { roomId, tableCardId, targetId });
+    },
 
-    set({
-      myCards:
-        owner === "player" ? myCards.filter((c) => c.id !== cardId) : myCards,
-      discardPile: [...discardPile, { ...cardToPlay, owner }],
-    });
-  },
+    inspectStealPick: (targetId, cardInstanceId) => {
+      const { roomId } = get();
+      if (roomId) {
+        socket.emit("inspect_steal_pick", { roomId, targetId, cardInstanceId });
+        set({ inspectStealResult: null });
+      }
+    },
 
-  finishTurn: () => {
-    const { discardPile, usedCards } = get();
-    if (discardPile.length === 0) return;
-    set({
-      usedCards: [...usedCards, ...discardPile],
-      discardPile: [],
-    });
-  },
+    drawCard: () => {
+      const { roomId } = get();
+      if (roomId) socket.emit("draw_card", roomId);
+    },
+    endTurn: () => {
+      const { roomId } = get();
+      if (roomId) socket.emit("end_turn", roomId);
+    },
+    declareMadMouse: () => {
+      const { roomId } = get();
+      if (roomId) socket.emit("declare_mad_mouse", roomId);
+    },
+    mulligan: () => {
+      const { roomId } = get();
+      if (roomId) socket.emit("mulligan", roomId);
+    },
+    restartGame: () => {
+      const { roomId } = get();
+      if (roomId) socket.emit("restart_game", roomId);
+    },
 
-  initGame: () => {
-    set({
-      myCards: [],
-      discardPile: [],
-      usedCards: [],
-      isHistoryOpen: false,
-    });
-    // Išdaliname po 5 kortas (perduodame true, kad nesiųstų draw_card įvykio 5 kartus)
-    // for (let i = 0; i < 5; i++) {
-    //   setTimeout(() => get().drawCard(true), i * 150);
-    // }
-  },
-
-  setHistoryOpen: (open) => set({ isHistoryOpen: open }),
-  setSelectedHistoryCard: (id) => set({ selectedHistoryCard: id }),
-  setZoomedHistoryCard: (id) => set({ zoomedHistoryCard: id }),
-}));
+    clearInspect: () => set({ inspectResult: null }),
+    clearInspectSteal: () => set({ inspectStealResult: null }),
+    clearActionNeedsTarget: () => set({ actionNeedsTarget: null }),
+  };
+});

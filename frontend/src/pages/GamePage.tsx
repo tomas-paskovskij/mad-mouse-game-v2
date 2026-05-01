@@ -1,55 +1,16 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { motion } from "framer-motion";
-import { useGameStore } from "../store/useGameStore";
 import GameBoard from "../components/game/GameBoard";
-import PlayerHand from "../components/game/PlayerHand";
-import Scoreboard from "../components/game/Scoreboard";
-import Opponents from "../components/game/Opponents";
 import "./GamePage.css";
 
 const GamePage: React.FC = () => {
-  // Pasiimame tik pradinio užkrovimo funkciją ir žaidėjo vardą (jei reikia)
-  const initGame = useGameStore((state) => state.initGame);
-  const currentPlayer = "Tomas"; // Galima vėliau irgi įsikelti į store
-
-  // Žaidimo pradžia: išdaliname kortas tik vieną kartą užkrovus
-  useEffect(() => {
-    console.log("Žaidimas inicijuojamas..."); // Patikrinimui konsolėje
-    initGame();
-  }, []);
-
   return (
     <motion.div
       className="game-container"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      {/* VIRŠUS: Kiti žaidėjai */}
-      <header className="game-header">
-        <Opponents />
-      </header>
-
-      <main className="game-main-layout">
-        {/* KAIRĖ: Rezultatai */}
-        {/* <aside className="game-sidebar">
-          <Scoreboard />
-        </aside> */}
-
-        {/* VIDURYS: Stalas */}
-        <section className="game-center">
-          <div className="turn-indicator">
-            Ėjimą atlieka: <span>{currentPlayer}</span>
-          </div>
-          {/* GameBoard pats pasiims drawCard iš Zustand */}
-          <GameBoard />
-        </section>
-      </main>
-
-      {/* APAČIA: Tavo kortos */}
-      <footer className="game-footer">
-        {/* PlayerHand pats pasiims myCards iš Zustand */}
-        <PlayerHand />
-      </footer>
+      <GameBoard />
     </motion.div>
   );
 };

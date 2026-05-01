@@ -1,375 +1,706 @@
-/* PAGRINDINIS KONTEINERIS */
 .game-board {
   display: flex;
+  flex-direction: column;
   width: 100%;
-  height: 600px;
-  background: #0a0a0a;
-  padding: 20px;
-  gap: 20px;
+  min-height: 100vh;
+  background: #060a0e;
   color: white;
-  overflow: hidden;
-  position: relative; /* Svarbu overlay pozicionavimui */
-}
-
-/* START GAME OVERLAY (LOBBY) */
-.start-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.8);
-  z-index: 500;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  backdrop-filter: blur(10px);
-}
-
-.start-box {
-  background: #161616;
-  padding: 40px;
-  border-radius: 24px;
-  border: 2px solid #3498db;
-  text-align: center;
-  box-shadow: 0 0 40px rgba(52, 152, 219, 0.2);
-  max-width: 400px;
-  width: 90%;
-}
-
-.start-box h2 {
-  margin-bottom: 10px;
-  color: #fff;
-}
-
-.start-box p {
-  color: #888;
-  margin-bottom: 25px;
-}
-
-.big-start-btn {
-  padding: 15px 45px;
-  font-size: 1.1rem;
-  font-weight: 800;
-  background: #27ae60;
-  color: white;
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.big-start-btn:hover {
-  background: #2ecc71;
-  transform: scale(1.05);
-  box-shadow: 0 0 20px rgba(46, 204, 113, 0.4);
-}
-
-/* STALO CENTRAS */
-.table-center {
-  flex: 1;
-  background: radial-gradient(circle, #1a1a1a 0%, #050505 100%);
-  border-radius: 40px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
-  border: 1px solid #222;
-  transition: filter 0.5s ease;
-}
-
-.table-center.blur {
-  filter: blur(5px);
-}
-
-/* KORTŲ EILUTĖ ANT STALO */
-.cards-row {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: -40px; /* Persidengimas */
-}
-
-.table-card-container {
   position: relative;
-  transition: transform 0.3s ease;
+  padding: 6px 6px 0;
+  gap: 6px;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
-.table-card-container:hover {
-  transform: translateY(-15px) scale(1.05);
-  z-index: 100 !important;
-}
-
-/* SAVININKO ŽYMA */
-.owner-label {
-  position: absolute;
-  top: -28px;
+/* ─── PRANEŠIMAI ─────────────────────────────────────────────────────────────── */
+.notification {
+  position: fixed;
+  top: 10px;
   left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.6rem;
-  font-weight: 900;
-  text-transform: uppercase;
-  padding: 2px 10px;
-  border-radius: 4px;
+  z-index: 600;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
   white-space: nowrap;
+  max-width: 88vw;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   pointer-events: none;
-  z-index: 10;
+}
+.notification--action {
+  background: #185fa5;
+  color: #e6f1fb;
+}
+.notification--response {
+  background: #1d4ed8;
+  color: #dbeafe;
+}
+.notification--trap {
+  background: #6b21a8;
+  color: #f3e8ff;
+}
+.notification--curse {
+  background: #991b1b;
+  color: #fee2e2;
+}
+.notification--turn {
+  background: #14532d;
+  color: #dcfce7;
+}
+.notification--skip {
+  background: #374151;
+  color: #e5e7eb;
+}
+.notification--shield {
+  background: #14532d;
+  color: #dcfce7;
+}
+.notification--mad_mouse {
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 0.9rem;
 }
 
-.player .owner-label {
-  background: #3498db;
-  color: white;
+/* ─── OVERLAYS ───────────────────────────────────────────────────────────────── */
+.card-menu-overlay,
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  z-index: 700;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
 }
-.opponent .owner-label {
-  background: #e74c3c;
-  color: white;
-}
-
-/* GLOW RĖMELIAI (Universalūs) */
-.glow-wrapper {
-  padding: 3px;
-  border-radius: 12px;
-  transition: all 0.3s ease;
-}
-
-.glow-wrapper.player {
-  background: linear-gradient(45deg, #3498db, #2980b9);
-  box-shadow: 0 0 15px rgba(52, 152, 219, 0.4);
-}
-
-.glow-wrapper.opponent {
-  background: linear-gradient(45deg, #e74c3c, #c0392b);
-  box-shadow: 0 0 15px rgba(231, 76, 60, 0.4);
-}
-
-/* ŠONINĖ PANELĖ */
-.side-panel {
-  width: 180px;
-  background: #111;
+.card-menu {
+  background: #0f172a;
+  border: 1px solid #1e293b;
   border-radius: 20px;
   padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 25px;
-  border: 1px solid #222;
-}
-
-.finish-turn-btn {
-  width: 100%;
-  padding: 12px;
-  background: #1b5e20;
-  border-radius: 8px;
-  border: none;
-  color: white;
-  font-weight: bold;
-  opacity: 0.3;
-  text-transform: uppercase;
-  transition: 0.2s;
-}
-
-.finish-turn-btn.active {
-  opacity: 1;
-  background: #2e7d32;
-  cursor: pointer;
-  box-shadow: 0 4px 15px rgba(46, 125, 50, 0.4);
-}
-
-/* 3D KALADĖ */
-.deck-container {
-  position: relative;
-  width: 100px;
-  height: 140px;
-  margin-top: 30px;
-}
-
-.deck-pile {
-  width: 100%;
-  height: 100%;
-  background: #2c3e50;
-  border-radius: 12px;
-  border: 1px solid #34495e;
-  display: flex;
-  justify-content: center;
   align-items: center;
-  cursor: pointer;
-  box-shadow:
-    0 1px 0 #1a252f,
-    0 calc(var(--layers) * 1px) 0 #1a252f,
-    0 calc(var(--layers) * 2px + 10px) 20px rgba(0, 0, 0, 0.6);
-  transform: translateY(calc(var(--layers) * -1.2px));
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-}
-
-.deck-pile:active {
-  transform: translateY(0);
-}
-
-.card-back {
-  font-weight: 900;
-  color: #3498db;
-  font-size: 1.6rem;
-  user-select: none;
-}
-
-/* ISTORIJOS LIZDAS */
-.discard-slot-visual {
-  width: 100px;
-  height: 140px;
-  border: 2px dashed #333;
-  border-radius: 12px;
+  gap: 14px;
   position: relative;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  width: 100%;
+  max-width: 200px;
 }
-
-.used-card-preview-wrapper {
-  transform: scale(0.8);
+.card-menu-preview {
   pointer-events: none;
+  transform: scale(0.9);
 }
-
-.hover-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 0.7rem;
-  opacity: 0;
-  transition: opacity 0.2s;
-  z-index: 5;
-}
-
-.discard-slot-visual:hover .hover-overlay {
-  opacity: 1;
-}
-
-/* ISTORIJOS MODALAS */
-.history-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.95);
-  z-index: 1000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.history-content {
-  width: 85%;
-  height: 85%;
-  background: #111;
-  border-radius: 25px;
-  padding: 30px;
+.card-menu-actions {
   display: flex;
   flex-direction: column;
-  border: 1px solid #333;
+  gap: 8px;
+  width: 100%;
 }
-
-.history-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 25px;
-  overflow-y: auto;
-  padding: 20px;
-}
-
-.history-card-item {
+.cmb {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1.5px solid;
+  font-size: 0.82rem;
+  font-weight: 700;
   cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+.cmb--inspect {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+.cmb--inspect:hover {
+  border-color: #64748b;
+  color: white;
+}
+.cmb--play {
+  background: #0c1e38;
+  border-color: #1d4ed8;
+  color: #60a5fa;
+}
+.cmb--play:hover {
+  background: #1d4ed8;
+  color: white;
+}
+.cmb--mulligan {
+  background: #1a1a0a;
+  border-color: #ca8a04;
+  color: #fbbf24;
+}
+.cmb--mulligan:hover {
+  background: #ca8a04;
+  color: white;
+}
+.cmb--discard {
+  background: #1a0a0a;
+  border-color: #7f1d1d;
+  color: #f87171;
+}
+.cmb--discard:hover {
+  background: #7f1d1d;
+  color: white;
+}
+.card-menu-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: #475569;
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.card-menu-close:hover {
+  color: white;
+}
+
+.zoom-card-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
   position: relative;
 }
-
-.history-card-item:hover {
-  transform: translateY(-5px);
+.zoom-card-wrapper .card {
+  transform: scale(1.5);
+  transform-origin: center;
+  margin: 50px 0;
+}
+.card-menu-overlay .zoom-card-wrapper .card {
+  transform: scale(2.2) !important;
+  transition: transform 0.3s ease-out;
+}
+.modal {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 20px;
+  padding: 24px 20px;
+  width: 100%;
+  max-width: 340px;
+  max-height: 80vh;
+  overflow-y: auto;
+  text-align: center;
+}
+.modal--wide {
+  max-width: 480px;
+}
+.modal h3 {
+  font-size: 1rem;
+  margin-bottom: 6px;
+}
+.modal-sub {
+  color: #64748b;
+  font-size: 0.78rem;
+  margin-bottom: 14px;
+  display: block;
+}
+.target-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.target-btn {
+  background: #1e293b;
+  border: 1.5px solid #334155;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  display: flex;
+  justify-content: space-between;
+  transition: border-color 0.15s;
+}
+.target-btn:hover {
+  border-color: #60a5fa;
+}
+.target-count {
+  color: #64748b;
+  font-size: 0.72rem;
+}
+.btn-cancel {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #64748b;
+  padding: 8px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  margin-top: 10px;
+  transition: color 0.15s;
+}
+.btn-cancel:hover {
+  color: white;
+}
+.cards-scroll {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin: 14px 0;
+  max-height: 50vh;
+  overflow-y: auto;
 }
 
-.card-options-menu {
+/* ─── ĖJIMO JUOSTA ───────────────────────────────────────────────────────────── */
+.turn-bar {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 5px 16px;
+  border-radius: 20px;
+  background: #0f172a;
+  color: #475569;
+  align-self: center;
+  letter-spacing: 0.04em;
+}
+.turn-bar--mine {
+  background: #052e16;
+  color: #4ade80;
+  border: 1px solid #166534;
+  animation: glow-green 2s ease-in-out infinite;
+}
+@keyframes glow-green {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(74, 222, 128, 0);
+  }
+}
+
+/* ─── ACTION POINT INDIKATORIUS ──────────────────────────────────────────────── */
+.action-point {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 10px;
+  margin-left: auto;
+}
+.action-point--available {
+  background: #0c1e38;
+  color: #60a5fa;
+  border: 1px solid #1d4ed8;
+  animation: glow-blue 1.5s ease-in-out infinite;
+}
+.action-point--used {
+  background: #1a2a1a;
+  color: #4ade80;
+  border: 1px solid #166534;
+}
+@keyframes glow-blue {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0);
+  }
+}
+
+/* ─── POKERIO STALAS ─────────────────────────────────────────────────────────── */
+.poker-table-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 4px;
+}
+.poker-table {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  height: 220px;
+  background: radial-gradient(
+    ellipse at center,
+    #166534 0%,
+    #14532d 55%,
+    #052e16 100%
+  );
+  border-radius: 50%;
+  border: 6px solid #1c0f07;
+  box-shadow:
+    0 0 0 2px #2d1810,
+    0 6px 32px rgba(0, 0, 0, 0.7),
+    inset 0 2px 6px rgba(255, 255, 255, 0.04);
+}
+.table-center {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.9);
-  border: 1px solid #444;
-  border-radius: 8px;
-  padding: 10px;
-  z-index: 20;
-}
-
-.zoom-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.9);
   display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.pile-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.pile-lbl {
+  font-size: 0.55rem;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+.pile-empty {
+  font-size: 0.55rem;
+  color: rgba(255, 255, 255, 0.2);
+}
+.discard-stack {
+  position: relative;
+  width: 38px;
+  height: 52px;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  align-items: center;
-  z-index: 150;
 }
-
-.zoomed-card-box {
-  transform: scale(1.4);
+.discard-mini {
+  position: absolute;
+  width: 30px;
+  height: 42px;
+  border-radius: 5px;
+  border: 1.5px solid;
+  top: 5px;
+  left: 4px;
+  opacity: 0.85;
 }
-
-.history-header {
+.deck-stack {
+  width: 38px;
+  height: 52px;
+  background: #1e1e3a;
+  border-radius: 7px;
+  border: 1.5px solid #2a2a4a;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  border-bottom: 1px solid #222;
-  padding-bottom: 15px;
+  justify-content: center;
+  cursor: default;
+  box-shadow: 0 calc(var(--layers, 0) * 1px) 0 #050510;
+  transform: translateY(calc(var(--layers, 0) * -0.5px));
+  transition: border-color 0.2s;
+}
+.deck-stack--active {
+  cursor: pointer;
+  border-color: #3b82f6;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.25);
+}
+.deck-stack--active:hover {
+  border-color: #60a5fa;
+}
+.deck-mouse {
+  font-size: 1.3rem;
 }
 
-.close-btn {
-  background: #e74c3c;
+/* ─── ŽAIDĖJŲ SĖDYNĖS ───────────────────────────────────────────────────────── */
+.player-seat {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition: opacity 0.3s;
+}
+.player-seat--offline {
+  opacity: 0.4;
+}
+.player-seat--active .player-icon {
+  border-color: #4ade80;
+  color: #4ade80;
+  background: #052e16;
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.4);
+}
+.seat-traps {
+  display: flex;
+  margin-bottom: 3px;
+}
+.trap-face-down {
+  width: 16px;
+  height: 22px;
+  background: #1a0a2e;
+  border: 1.5px solid #7c3aed;
+  border-radius: 3px;
+  margin-left: -4px;
+}
+.trap-face-down:first-child {
+  margin-left: 0;
+}
+.trap-face-down--sm {
+  width: 20px;
+  height: 28px;
+}
+.player-icon {
+  width: 34px;
+  height: 34px;
+  background: #1e293b;
+  border: 2px solid #334155;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  transition: all 0.2s;
+}
+.player-icon--active {
+  border-color: #4ade80;
+  color: #4ade80;
+  background: #052e16;
+}
+.player-icon--me {
+  background: #0c1e38;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+/* Mad Mouse mirksintis badge */
+.mad-mouse-pending-badge {
+  font-size: 0.55rem;
+  font-weight: 900;
+  color: #fbbf24;
+  background: #1c1000;
+  border: 1px solid #ca8a04;
+  border-radius: 6px;
+  padding: 2px 5px;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+.seat-name {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seat-count {
+  font-size: 0.55rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+.seat-curse {
+  font-size: 0.6rem;
+}
+.seat-offline {
+  font-size: 0.6rem;
+}
+
+/* ─── MAD MOUSE BANNER ───────────────────────────────────────────────────────── */
+.my-mad-mouse-banner {
+  text-align: center;
+  padding: 8px 16px;
+  background: #1c1000;
+  border: 1.5px solid #ca8a04;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fbbf24;
+  letter-spacing: 0.04em;
+}
+
+/* ─── MANO TRAP KORTOS ───────────────────────────────────────────────────────── */
+.my-traps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 5px 10px;
+  background: #0a0718;
+  border-radius: 10px;
+  border: 1px solid #1e0a38;
+}
+.my-traps-lbl {
+  font-size: 0.62rem;
+  color: #7c3aed;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.my-trap-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #13082a;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid #4c1d95;
+}
+.my-trap-name {
+  font-size: 0.65rem;
+  color: #a78bfa;
+  font-weight: 700;
+}
+.btn-activate {
+  background: #6b21a8;
   border: none;
   color: white;
-  padding: 10px 25px;
-  border-radius: 8px;
+  padding: 3px 8px;
+  border-radius: 6px;
   cursor: pointer;
-  font-weight: bold;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+.btn-activate:hover {
+  background: #7c3aed;
 }
 
-.discard-slot-visual {
-  width: 100px;
-  height: 140px;
-  position: relative; /* Būtina, kad absoliutūs vaikai matytųsi */
+/* ─── DEŠINĖ PANELĖ ──────────────────────────────────────────────────────────── */
+.side-btns {
+  position: absolute;
+  right: 8px;
+  bottom: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  z-index: 10;
+}
+.btn-mad-mouse {
+  width: 68px;
+  padding: 8px 0;
+  background: #1d4ed8;
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 800;
+  cursor: pointer;
+  text-align: center;
+  line-height: 1.4;
+  animation: pulse-blue 1.2s ease-in-out infinite;
+}
+@keyframes pulse-blue {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(29, 78, 216, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(29, 78, 216, 0);
+  }
+}
+
+/* ─── RANKA ───────────────────────────────────────────────────────────────────── */
+.hand-area {
+  padding: 4px 0 8px;
+}
+.hand-header {
+  display: flex;
+  align-items: center;
+  padding: 0 6px 4px;
+  gap: 8px;
+}
+.my-seat-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hand-lbl {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #64748b;
+}
+.hand-mad-mouse {
+  font-size: 1rem;
+}
+.hand-cards {
+  display: flex;
+  align-items: flex-end;
+  min-height: 120px;
+  padding: 0 80px 0 6px;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+.hand-card {
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.card-hidden {
+  width: 80px;
+  height: 120px;
+  background: #1e293b;
+  border: 1.5px solid #334155;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #334155;
+}
+.hand-empty {
+  color: #334155;
+  font-size: 0.75rem;
+  padding: 16px;
+  text-align: center;
+}
+
+/* ─── WINNER ──────────────────────────────────────────────────────────────────── */
+.winner-screen {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.96);
+  z-index: 999;
   display: flex;
   justify-content: center;
   align-items: center;
-  border: 1px dashed #444;
-  border-radius: 12px;
 }
-
-.stacked-cards {
-  position: relative;
-  width: 80px; /* Kortos dydis turi atitikti tavo Card komponentą */
-  height: 110px;
+.winner-box {
+  text-align: center;
+  padding: 20px;
 }
-
-.stacked-card-layer {
-  position: absolute;
-  width: 100%;
-  height: 100%;
+.winner-emoji {
+  font-size: 5rem;
+  margin-bottom: 12px;
+  display: block;
 }
-
-/* Įsitikink, kad korta krūvoje nėra per didelė */
-.stacked-card-layer .card {
-  transform: scale(0.8); /* Sumažiname, kad tilptų į šoninį panelį */
+.winner-box h2 {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #3b82f6;
+  margin-bottom: 6px;
 }
-/*
-.player-hand {
+.winner-name {
+  font-size: 1.1rem;
+  color: #64748b;
+  margin-bottom: 24px;
+}
+.winner-actions {
   display: flex;
+  gap: 12px;
   justify-content: center;
-  position: fixed;
-  bottom: 20px;
-  width: 100%;
-  pointer-events: none; 
+  flex-wrap: wrap;
 }
-.hand-card-wrapper {
-  pointer-events: auto; 
+.winner-btn {
+  padding: 12px 24px;
+  border-radius: 12px;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 800;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: all 0.15s;
 }
-*/
+.winner-btn--restart {
+  background: #1d4ed8;
+  color: white;
+}
+.winner-btn--restart:hover {
+  background: #2563eb;
+}
+.winner-btn--lobby {
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1.5px solid #334155;
+}
+.winner-btn--lobby:hover {
+  color: white;
+  border-color: #64748b;
+}

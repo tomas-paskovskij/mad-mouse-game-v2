@@ -1,130 +1,365 @@
 [
   {
-    "id": "a1",
+    "id": "a01",
     "type": "action",
-    "title": "Sūrio vagis",
-    "description": "Pavok 1 atsitiktinę kortą iš pasirinkto žaidėjo.",
-    "effect": "steal_random_card",
-    "requiresTarget": true
+    "title": "Dviguba porcija",
+    "description": "Patrauk 2 papildomas kortas iš kaladės.",
+    "effect": "draw_two",
+    "requiresTarget": false,
+    "count": 4
   },
   {
-    "id": "a2",
+    "id": "a02",
+    "type": "action",
+    "title": "Triguba porcija",
+    "description": "Patrauk 3 papildomas kortas iš kaladės.",
+    "effect": "draw_three",
+    "requiresTarget": false,
+    "count": 2
+  },
+  {
+    "id": "a03",
     "type": "action",
     "title": "Chaosas",
-    "description": "Surenka visų žaidėjų kortas, sumaišo ir padalina iš naujo po lygiai.",
+    "description": "Visi žaidėjai sumaišo ir padalina kortas iš naujo po lygiai.",
     "effect": "shuffle_redistribute",
-    "requiresTarget": false
+    "requiresTarget": false,
+    "count": 3
   },
   {
-    "id": "a3",
+    "id": "a04",
     "type": "action",
-    "title": "Mainai",
-    "description": "Apsikeisk visomis kortomis su pasirinktu žaidėju.",
-    "effect": "swap_hands",
-    "requiresTarget": true
+    "title": "Praleisk ėjimą",
+    "description": "Pasirinktas žaidėjas praleidžia kitą savo ėjimą.",
+    "effect": "skip_turn",
+    "requiresTarget": true,
+    "count": 4
   },
   {
-    "id": "a4",
+    "id": "a05",
+    "type": "action",
+    "title": "Du ėjimai",
+    "description": "Šį ėjimą gali padaryti du veiksmus iš eilės.",
+    "effect": "double_turn",
+    "requiresTarget": false,
+    "count": 2
+  },
+  {
+    "id": "a06",
+    "type": "action",
+    "title": "Inspekcija",
+    "description": "Pamatyk visas pasirinkto žaidėjo kortas (tik tau matomos).",
+    "effect": "inspect_hand",
+    "requiresTarget": true,
+    "count": 3
+  },
+  {
+    "id": "a07",
+    "type": "action",
+    "title": "Pelės uodega",
+    "description": "Pasirinktas žaidėjas privalo patraukti 2 kortas.",
+    "effect": "force_draw_two",
+    "requiresTarget": true,
+    "count": 4
+  },
+  {
+    "id": "a08",
+    "type": "action",
+    "title": "Visi traukia",
+    "description": "Visi žaidėjai patraukia po 1 papildomą kortą.",
+    "effect": "all_draw_one",
+    "requiresTarget": false,
+    "count": 3
+  },
+  {
+    "id": "a09",
+    "type": "action",
+    "title": "Išmesk kortą",
+    "description": "Pasirinktas žaidėjas privalo išmesti 1 atsitiktinę kortą iš rankos.",
+    "effect": "force_discard",
+    "requiresTarget": true,
+    "count": 3
+  },
+  {
+    "id": "a10",
     "type": "action",
     "title": "Dovanojimas",
     "description": "Atiduok pasirinktą savo kortą bet kuriam žaidėjui.",
     "effect": "give_card",
     "requiresTarget": true,
-    "requiresCardSelection": true
+    "requiresCardSelection": true,
+    "count": 3
   },
   {
-    "id": "a5",
+    "id": "a11",
     "type": "action",
-    "title": "Dviguba porcija",
-    "description": "Trauk 2 kortas vietoj 1 šį ėjimą.",
-    "effect": "draw_two",
-    "requiresTarget": false
-  },
-  {
-    "id": "a6",
-    "type": "action",
-    "title": "Praleisk ėjimą",
-    "description": "Pasirinktas žaidėjas praleidžia kitą savo ėjimą.",
-    "effect": "skip_turn",
-    "requiresTarget": true
-  },
-  {
-    "id": "a7",
-    "type": "action",
-    "title": "Inspekcija",
-    "description": "Pamatyk visas pasirinkto žaidėjo kortas (tik tau matomos).",
-    "effect": "inspect_hand",
-    "requiresTarget": true
-  },
-  {
-    "id": "a8",
-    "type": "action",
-    "title": "Pelės uodega",
-    "description": "Pasirinktas žaidėjas privalo iš karto patraukti 2 kortas.",
-    "effect": "force_draw_two",
-    "requiresTarget": true
-  },
-  {
-    "id": "a9",
-    "type": "action",
-    "title": "Apsimetėlis",
-    "description": "Pakeisk vienos savo kortos tipą į bet kurį kitą šiam ėjimui.",
-    "effect": "change_card_type",
+    "title": "Grąžink ir traukyk",
+    "description": "Grąžink 1 savo kortą į kaladę ir patrauk 2 naujas.",
+    "effect": "return_draw_two",
     "requiresTarget": false,
-    "requiresCardSelection": true
+    "requiresCardSelection": true,
+    "count": 3
   },
   {
-    "id": "c1",
-    "type": "counter",
-    "title": "STOP!",
-    "description": "Atšauk bet kokį ką tik padėtą veiksmą.",
-    "effect": "cancel_action",
-    "isLightning": true,
-    "requiresTarget": false
+    "id": "a12",
+    "type": "action",
+    "title": "Kaladės peržiūra",
+    "description": "Pamatyk 3 viršutines kaladės kortas ir sudėk atgal bet kokia tvarka.",
+    "effect": "peek_deck",
+    "requiresTarget": false,
+    "count": 2
   },
   {
-    "id": "c2",
-    "type": "counter",
-    "title": "Atgal tau",
-    "description": "Nukreipk veiksmą į tą, kuris jį paleido.",
-    "effect": "reflect_action",
-    "isLightning": true,
-    "requiresTarget": false
+    "id": "a13",
+    "type": "action",
+    "title": "Aplink stalą",
+    "description": "Visi žaidėjai perduoda po 1 kortą kairėje sėdinčiam žaidėjui.",
+    "effect": "pass_left",
+    "requiresTarget": false,
+    "count": 3
   },
   {
-    "id": "c3",
-    "type": "counter",
-    "title": "Skydas",
-    "description": "Apsaugok save nuo bet kokio veiksmo šį ėjimą.",
-    "effect": "shield",
-    "isLightning": true,
-    "requiresTarget": false
+    "id": "a14",
+    "type": "action",
+    "title": "Atvirkščiai",
+    "description": "Visi žaidėjai perduoda po 1 kortą dešinėje sėdinčiam žaidėjui.",
+    "effect": "pass_right",
+    "requiresTarget": false,
+    "count": 3
   },
   {
-    "id": "t1",
+    "id": "a15",
+    "type": "action",
+    "title": "Kaladės maišymas",
+    "description": "Sumaišyk kaladę ir patrauk 1 kortą.",
+    "effect": "shuffle_draw",
+    "requiresTarget": false,
+    "count": 3
+  },
+  {
+    "id": "a16",
+    "type": "action",
+    "title": "Turto mokestis",
+    "description": "Žaidėjas su daugiausiai kortų atiduoda tau 1 atsitiktinę kortą.",
+    "effect": "tax_richest",
+    "requiresTarget": false,
+    "count": 2
+  },
+  {
+    "id": "a17",
+    "type": "action",
+    "title": "Solidarumas",
+    "description": "Žaidėjas su mažiausiai kortų patraukia 2 papildomas kortas.",
+    "effect": "help_poorest",
+    "requiresTarget": false,
+    "count": 2
+  },
+  {
+    "id": "a18",
+    "type": "action",
+    "title": "Amnezija",
+    "description": "Pasirinktas žaidėjas grąžina visas kortas į kaladę ir traukia tiek pat naujų.",
+    "effect": "amnesia",
+    "requiresTarget": true,
+    "count": 2
+  },
+
+  {
+    "id": "s01",
+    "type": "action",
+    "title": "Sūrio vagis",
+    "description": "Pavok 1 atsitiktinę kortą iš pasirinkto žaidėjo.",
+    "effect": "steal_random_card",
+    "requiresTarget": true,
+    "count": 4
+  },
+  {
+    "id": "s02",
+    "type": "action",
+    "title": "Mainai",
+    "description": "Apsikeisk visomis kortomis su pasirinktu žaidėju.",
+    "effect": "swap_hands",
+    "requiresTarget": true,
+    "count": 3
+  },
+  {
+    "id": "s03",
+    "type": "action",
+    "title": "Pasirinktas grobis",
+    "description": "Pažiūrėk pasirinkto žaidėjo kortas ir pasiimk 1.",
+    "effect": "inspect_steal",
+    "requiresTarget": true,
+    "count": 3
+  },
+  {
+    "id": "s04",
+    "type": "action",
+    "title": "Didysis apsimainymas",
+    "description": "Visi žaidėjai keičia visas kortas su kairėje esančiu žaidėju.",
+    "effect": "mass_swap",
+    "requiresTarget": false,
+    "count": 2
+  },
+  {
+    "id": "s05",
+    "type": "action",
+    "title": "Plėšikas",
+    "description": "Pavok po 1 atsitiktinę kortą iš kiekvieno žaidėjo.",
+    "effect": "steal_all_one",
+    "requiresTarget": false,
+    "count": 3
+  },
+
+  {
+    "id": "t01",
     "type": "trap",
     "title": "Pelėkautai",
-    "description": "Jei kas nors bando vogti tavo kortą — jie praranda 2 kortas.",
-    "effect": "trap_steal",
+    "description": "Kai kas nors bando vogti tavo kortą — jie praranda 2 kortas.",
+    "effect": "trap_steal_punish",
     "trigger": "on_steal_target",
-    "requiresTarget": false
+    "requiresTarget": false,
+    "count": 4
   },
   {
-    "id": "t2",
-    "type": "trap",
-    "title": "Spąstai",
-    "description": "Padėk ant stalo. Aktyvavęs savo ėjime — pasirinktas žaidėjas praranda 1 kortą.",
-    "effect": "trap_lose_card",
-    "trigger": "manual_activate",
-    "requiresTarget": true
-  },
-  {
-    "id": "t3",
+    "id": "t02",
     "type": "trap",
     "title": "Atspindys",
-    "description": "Automatiškai atspindi pirmą veiksmą, nukreiptą į tave.",
+    "description": "Automatiškai atspindi pirmą action kortą nukreiptą į tave.",
     "effect": "trap_reflect",
-    "trigger": "on_any_action_target",
-    "requiresTarget": false
+    "trigger": "on_action_target",
+    "requiresTarget": false,
+    "count": 3
+  },
+  {
+    "id": "t03",
+    "type": "trap",
+    "title": "Spąstai",
+    "description": "Aktyvuok savo ėjime: pasirinktas žaidėjas praranda 1 kortą.",
+    "effect": "trap_lose_card",
+    "trigger": "manual_activate",
+    "requiresTarget": true,
+    "count": 4
+  },
+  {
+    "id": "t04",
+    "type": "trap",
+    "title": "Laiko bomba",
+    "description": "Po 2 ėjimų sprogsta: visi žaidėjai išmeta po 1 kortą.",
+    "effect": "trap_time_bomb",
+    "trigger": "after_two_turns",
+    "requiresTarget": false,
+    "count": 3
+  },
+  {
+    "id": "t05",
+    "type": "trap",
+    "title": "Sargybinis",
+    "description": "Apsaugo tave nuo kito Steal efekto. Tada dingsta.",
+    "effect": "trap_guard",
+    "trigger": "on_steal_target",
+    "requiresTarget": false,
+    "count": 3
+  },
+  {
+    "id": "t06",
+    "type": "trap",
+    "title": "Mimika",
+    "description": "Kai kas nors šalia tavęs panaudoja action kortą — nukopijuoji tą efektą sau.",
+    "effect": "trap_mimic",
+    "trigger": "on_any_action",
+    "requiresTarget": false,
+    "count": 3
+  },
+
+  {
+    "id": "r01",
+    "type": "response",
+    "title": "Nope!",
+    "description": "Atšauk bet kokį ką tik panaudotą action ar steal kortą.",
+    "effect": "cancel_action",
+    "isLightning": true,
+    "requiresTarget": false,
+    "count": 5
+  },
+  {
+    "id": "r02",
+    "type": "response",
+    "title": "Atgal tau!",
+    "description": "Nukreipk veiksmą atgal į tą, kuris jį paleido.",
+    "effect": "reflect_action",
+    "isLightning": true,
+    "requiresTarget": false,
+    "count": 4
+  },
+  {
+    "id": "r03",
+    "type": "response",
+    "title": "Skydas",
+    "description": "Apsaugok save nuo bet kokio action efekto šį ėjimą.",
+    "effect": "shield",
+    "isLightning": true,
+    "requiresTarget": false,
+    "count": 3
+  },
+  {
+    "id": "r04",
+    "type": "response",
+    "title": "Ne dabar!",
+    "description": "Atidėk priešo ėjimą — jis praleidžia šią kortą ir traukia naują.",
+    "effect": "delay_action",
+    "isLightning": true,
+    "requiresTarget": false,
+    "count": 3
+  },
+
+  {
+    "id": "cu01",
+    "type": "curse",
+    "title": "Dvigubas praleidimas",
+    "description": "Pasirinktas žaidėjas praleidžia 2 ėjimus iš eilės. Matoma visiems.",
+    "effect": "curse_skip_two",
+    "requiresTarget": true,
+    "duration": 2,
+    "count": 2
+  },
+  {
+    "id": "cu02",
+    "type": "curse",
+    "title": "Turto prakeikimas",
+    "description": "Kiekvieną ėjimą pasirinktas žaidėjas atiduoda 1 kortą kairėje esančiam. Galioja 3 ėjimus.",
+    "effect": "curse_give_left",
+    "requiresTarget": true,
+    "duration": 3,
+    "count": 2
+  },
+  {
+    "id": "cu03",
+    "type": "curse",
+    "title": "Aklas",
+    "description": "Pasirinktas žaidėjas nemato savo kortų 2 ėjimus (kortos paslėptos).",
+    "effect": "curse_blind",
+    "requiresTarget": true,
+    "duration": 2,
+    "count": 2
+  },
+  {
+    "id": "cu04",
+    "type": "curse",
+    "title": "Kaladės prakeikimas",
+    "description": "Kai prakeiktas žaidėjas traukia kortą — ji eina į discard. Galioja 2 ėjimus.",
+    "effect": "curse_bad_draw",
+    "requiresTarget": true,
+    "duration": 2,
+    "count": 2
+  },
+  {
+    "id": "cu05",
+    "type": "curse",
+    "title": "Perkrovimas",
+    "description": "Pasirinktas žaidėjas privalo patraukti 3 kortas dabar.",
+    "effect": "curse_overload",
+    "requiresTarget": true,
+    "duration": 0,
+    "count": 2
   }
 ]

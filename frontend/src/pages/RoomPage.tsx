@@ -8,7 +8,6 @@ const RoomPage = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
 
-  // Duomenys iš Store
   const {
     roomName,
     hostName,
@@ -20,40 +19,17 @@ const RoomPage = () => {
   } = useRoomStore();
   const { username } = useAuthStore();
 
-  // Lokalios būsenos nustatymų redagavimui
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
 
   useEffect(() => {
     if (!socket.connected) socket.connect();
 
-    // 1. JUNGIAMĖS PRIE KAMBARIO:
-    // Siunčiame join_room tik jei mūsų dar nėra žaidėjų sąraše.
-    // Tai apsaugo nuo dvigubo join, kai CreateRoomPage jau mus prijungė.
     const isAlreadyIn = players.some((p) => p.username === username);
-
     if (roomId && username && !isAlreadyIn) {
-      console.log("🚀 RoomPage: Siunčiam join_room", {
-        roomId,
-        username,
-        password,
-      });
       socket.emit("join_room", { roomId, username, password });
     }
 
-    // Funkcija, kuri apdoroja gautus kambarių sąrašus
-    // const handleUpdate = (allRooms: any[]) => {
-    //   const current = allRooms.find((r) => r.id === roomId);
-    //   if (current) {
-    //     setRoomData(current, username);
-    //     if (!isEditing) setEditName(current.name);
-    //   } else {
-    //     // Jei kambario sąraše nebėra (pvz. ištrintas), grįžtame į lobby
-    //     navigate("/lobby");
-    //   }
-    // };
-
-    // 2. Klausomės TIK šio kambario atnaujinimų
     const handleRoomUpdate = (updatedRoom: any) => {
       if (updatedRoom.id === roomId) {
         setRoomData(updatedRoom, username);
@@ -61,43 +37,24 @@ const RoomPage = () => {
       }
     };
 
+    // Kai serveris praneša žaidimas prasidėjo — visi nukeliami į žaidimą
+    const handleGameStarted = () => {
+      navigate(`/game/${roomId}`);
+    };
+
     socket.on("room_data_update", handleRoomUpdate);
-
-    // Klausomės serverio pranešimų
-    // socket.on("update_rooms", handleUpdate);
-
+    socket.on("game_started", handleGameStarted);
     socket.on("kicked_from_room", () => {
       alert("You have been kicked by the host.");
       navigate("/lobby");
     });
 
-    // Svarbu: Vos užkrovus puslapį, pasakome serveriui, kad mes čia
-    // socket.emit("join_room", { roomId, username, password });
-    // console.log("password", password);
-    // console.log("roomname", roomName);
-    // console.log("roomnid", roomId);
-    // console.log("username", username);
-
     return () => {
-      // socket.off("update_rooms", handleUpdate);
       socket.off("room_data_update", handleRoomUpdate);
+      socket.off("game_started", handleGameStarted);
       socket.off("kicked_from_room");
-      // clearRoom(); // PATARIMAS: Jei meta null, laikinai užkomentuok šitą
     };
   }, [roomId, username]);
-
-  // useEffect(() => {
-  //   // Šitą eilutę IŠTRINK arba UŽKOMENTUOK:
-  //   // socket.emit("join_room", { roomId, username });
-
-  //   const handleUpdate = (allRooms: any[]) => {
-  //     const current = allRooms.find((r) => r.id === roomId);
-  //     if (current) setRoomData(current, username);
-  //   };
-
-  //   socket.on("update_rooms", handleUpdate);
-  //   return () => socket.off("update_rooms", handleUpdate);
-  // }, [roomId]);
 
   const handleLeave = () => {
     socket.emit("leave_room", roomId);
@@ -113,7 +70,11 @@ const RoomPage = () => {
     socket.emit("toggle_ready", roomId);
   };
 
-  // Jei dar neturime duomenų, rodome krovimąsi
+  // Hostas siunčia start_game — serveris praneš visiems per game_started
+  const handleLaunchGame = () => {
+    socket.emit("start_game", roomId);
+  };
+
   if (!roomName) {
     return (
       <div className="flex items-center justify-center min-h-screen text-white font-black uppercase tracking-widest animate-pulse">
@@ -207,10 +168,11 @@ const RoomPage = () => {
 
           {isAdmin && (
             <button
+              onClick={handleLaunchGame}
               disabled={!allReady}
               className={`w-full py-5 rounded-2xl font-black text-xl uppercase transition-all ${
                 allReady
-                  ? "bg-white text-slate-900 hover:bg-indigo-500 hover:text-white shadow-2xl"
+                  ? "bg-white text-slate-900 hover:bg-indigo-500 hover:text-white shadow-2xl cursor-pointer"
                   : "bg-slate-800 text-slate-600 border border-slate-700 cursor-not-allowed opacity-50"
               }`}
             >

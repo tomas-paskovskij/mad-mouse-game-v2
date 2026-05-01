@@ -13,17 +13,33 @@
   flex-shrink: 0;
 }
 
+/* Tipų spalvos */
 .card--action {
   background: #e6f1fb;
   border-color: #85b7eb;
 }
-.card--counter {
-  background: #fcebeb;
-  border-color: #f09595;
-}
 .card--trap {
-  background: #faeeda;
-  border-color: #ef9f27;
+  background: #f3e8ff;
+  border-color: #c084fc;
+}
+.card--response {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+.card--curse {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+.card--hidden {
+  background: #1e1e2e;
+  border-color: #2a2a3a;
+  align-items: center;
+  justify-content: center;
+}
+
+.card__hidden-icon {
+  font-size: 2rem;
+  color: #444;
 }
 
 .card__top {
@@ -32,7 +48,6 @@
   align-items: flex-start;
   margin-bottom: 8px;
 }
-
 .card__dot {
   width: 8px;
   height: 8px;
@@ -43,11 +58,14 @@
 .card--action .card__dot {
   background: #185fa5;
 }
-.card--counter .card__dot {
-  background: #a32d2d;
-}
 .card--trap .card__dot {
-  background: #854f0b;
+  background: #6b21a8;
+}
+.card--response .card__dot {
+  background: #1d4ed8;
+}
+.card--curse .card__dot {
+  background: #991b1b;
 }
 
 .card__lightning {
@@ -57,7 +75,6 @@
   background: #eaf3de;
   color: #27500a;
   border: 0.5px solid #97c459;
-  font-style: normal;
 }
 
 .card__icon {
@@ -75,11 +92,14 @@
 .card--action .card__title {
   color: #0c447c;
 }
-.card--counter .card__title {
-  color: #791f1f;
-}
 .card--trap .card__title {
-  color: #633806;
+  color: #4c1d95;
+}
+.card--response .card__title {
+  color: #1e3a8a;
+}
+.card--curse .card__title {
+  color: #7f1d1d;
 }
 
 .card__desc {
@@ -90,11 +110,14 @@
 .card--action .card__desc {
   color: #185fa5;
 }
-.card--counter .card__desc {
-  color: #a32d2d;
-}
 .card--trap .card__desc {
-  color: #854f0b;
+  color: #6b21a8;
+}
+.card--response .card__desc {
+  color: #1d4ed8;
+}
+.card--curse .card__desc {
+  color: #991b1b;
 }
 
 .card__bottom {
@@ -107,11 +130,14 @@
 .card--action .card__bottom {
   border-color: #85b7eb;
 }
-.card--counter .card__bottom {
-  border-color: #f09595;
-}
 .card--trap .card__bottom {
-  border-color: #ef9f27;
+  border-color: #c084fc;
+}
+.card--response .card__bottom {
+  border-color: #93c5fd;
+}
+.card--curse .card__bottom {
+  border-color: #fca5a5;
 }
 
 .card__type-label {
@@ -123,9 +149,12 @@
 .card--action .card__type-label {
   color: #185fa5;
 }
-.card--counter .card__type-label {
-  color: #a32d2d;
-}
 .card--trap .card__type-label {
-  color: #854f0b;
+  color: #6b21a8;
+}
+.card--response .card__type-label {
+  color: #1d4ed8;
+}
+.card--curse .card__type-label {
+  color: #991b1b;
 }
