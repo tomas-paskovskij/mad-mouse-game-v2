@@ -15,6 +15,7 @@ const PawnIcon = ({ size = 24 }: { size?: number }) => (
   </svg>
 );
 
+// Kortos veiksmu meniu
 interface CardMenuProps {
   card: CardType;
   isMyTurn: boolean;
@@ -48,7 +49,6 @@ const CardActionMenu: React.FC<CardMenuProps> = ({
       card.type === "response" &&
       (card.effect === "shield" || pendingAction !== null));
   const canMulligan = turnNumber === 0 && !mulliganUsed;
-
   return (
     <motion.div
       className="card-menu-overlay"
@@ -95,6 +95,112 @@ const CardActionMenu: React.FC<CardMenuProps> = ({
   );
 };
 
+// Trap kortos meniu (peržiūrėti / aktyvuoti)
+interface TrapMenuProps {
+  tc: TableCard;
+  isMyTurn: boolean;
+  actionUsed: boolean;
+  onInspect: () => void;
+  onActivate: () => void;
+  onClose: () => void;
+}
+
+const TrapMenu: React.FC<TrapMenuProps> = ({
+  tc,
+  isMyTurn,
+  actionUsed,
+  onInspect,
+  onActivate,
+  onClose,
+}) => (
+  <motion.div
+    className="card-menu-overlay"
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    onClick={onClose}
+  >
+    <motion.div
+      className="card-menu"
+      initial={{ scale: 0.85 }}
+      animate={{ scale: 1 }}
+      exit={{ scale: 0.85 }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="trap-menu-title">🪤 Mano spąstas</div>
+      <div className="trap-menu-name">{tc.card.title}</div>
+      <div className="card-menu-actions">
+        <button className="cmb cmb--inspect" onClick={onInspect}>
+          🔍 Peržiūrėti efektą
+        </button>
+        {tc.canActivate && isMyTurn && !actionUsed && (
+          <button className="cmb cmb--play" onClick={onActivate}>
+            ⚡ Aktyvuoti
+          </button>
+        )}
+      </div>
+      <button className="card-menu-close" onClick={onClose}>
+        ✕
+      </button>
+    </motion.div>
+  </motion.div>
+);
+
+// Discard pile modalas
+interface DiscardModalProps {
+  discardPile: CardType[];
+  opponents: any[];
+  mySocketId: string | null;
+  onClose: () => void;
+}
+
+const DiscardModal: React.FC<DiscardModalProps> = ({
+  discardPile,
+  opponents,
+  mySocketId,
+  onClose,
+}) => {
+  // Discard pile neturi savininko info — rodome tik kortas su tipu ir pavadinimu
+  return (
+    <motion.div
+      className="overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="modal modal--wide"
+        initial={{ scale: 0.9 }}
+        animate={{ scale: 1 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3>🗑 Išmestų kortų kaladė ({discardPile.length})</h3>
+        <div className="discard-modal-list">
+          {discardPile.length === 0 && (
+            <p className="empty-msg">Dar nėra išmestų kortų</p>
+          )}
+          {[...discardPile].reverse().map((card, i) => (
+            <div
+              key={`${card.instanceId}-${i}`}
+              className={`discard-row discard-row--${card.type}`}
+            >
+              <span className="discard-num">#{discardPile.length - i}</span>
+              <span className="discard-type-dot" />
+              <span className="discard-title">{card.title}</span>
+              <span className="discard-type-label">{card.type}</span>
+            </div>
+          ))}
+        </div>
+        <button className="btn-cancel" onClick={onClose}>
+          Uždaryti
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// ─── PAGRINDINĖ KOMPONENTA ────────────────────────────────────────────────────
 const GameBoard: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
@@ -138,6 +244,9 @@ const GameBoard: React.FC = () => {
   const [selectingTarget, setSelectingTarget] = useState<CardType | null>(null);
   const [trapActivating, setTrapActivating] = useState<TableCard | null>(null);
   const [mulliganUsed, setMulliganUsed] = useState(false);
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const [trapMenuTc, setTrapMenuTc] = useState<TableCard | null>(null);
+  const [trapZoom, setTrapZoom] = useState<TableCard | null>(null);
 
   useEffect(() => {
     if (roomId) initGame(roomId);
@@ -152,7 +261,25 @@ const GameBoard: React.FC = () => {
   const iMadMousePending = madMousePlayerId === mySocketId;
   const canDeclareWin =
     myCards_.length >= (handLimit || 10) && !madMousePlayerId;
+
+  // VISI žaidėjai — aš + kiti (1 punktas)
+  const me = {
+    id: mySocketId,
+    username: "Tu",
+    cardCount: myCards_.length,
+    madMousePending: iMadMousePending,
+    isMe: true,
+    isConnected: true,
+    curses: [],
+  };
+  const allPlayers = [
+    me,
+    ...opponents_
+      .filter((o) => o.id !== socket.id)
+      .map((o) => ({ ...o, isMe: false })),
+  ];
   const otherPlayers = opponents_.filter((o) => o.id !== socket.id);
+
   const myTraps = tableCards_.filter(
     (tc) => tc.ownerId === mySocketId && tc.card.type === "trap",
   );
@@ -171,10 +298,27 @@ const GameBoard: React.FC = () => {
     curse: "#FEE2E2",
   };
 
-  function trapsByOwner(id: string) {
+  function trapsByOwner(id: string | null) {
     return tableCards_.filter(
       (tc) => tc.ownerId === id && tc.card.type === "trap",
     );
+  }
+
+  // Žaidėjų pozicijos aplink stalą (visi žaidėjai — 1 punktas)
+  function getSeatStyle(index: number, total: number): React.CSSProperties {
+    // Aš visada apačioje (ne ant pokerio stalo — žemiau)
+    // Kiti — aplink stalą viršuje
+    const angle = total <= 1 ? 270 : 180 + (index / (total - 1)) * 180;
+    const rad = angle * (Math.PI / 180);
+    const rx = 43,
+      ry = 40;
+    const cx = 50 + rx * Math.cos(rad);
+    const cy = 50 + ry * Math.sin(rad);
+    return {
+      left: `${cx}%`,
+      top: `${cy}%`,
+      transform: "translate(-50%, -50%)",
+    };
   }
 
   function handleCardMenuPlay(card: CardType) {
@@ -210,16 +354,20 @@ const GameBoard: React.FC = () => {
     }
   }
 
-  function handleActivateTrap(tc: TableCard) {
+  function handleTrapClick(tc: TableCard) {
+    setTrapMenuTc(tc);
+  }
+
+  function handleTrapInspect(tc: TableCard) {
+    setTrapMenuTc(null);
+    setTrapZoom(tc);
+  }
+
+  function handleTrapActivate(tc: TableCard) {
+    setTrapMenuTc(null);
     if (!isMyTurn || actionUsed) return;
     if (tc.card.requiresTarget) setTrapActivating(tc);
     else activateTrap(tc.id);
-  }
-
-  function handleMulligan() {
-    setMenuCard(null);
-    setMulliganUsed(true);
-    mulligan();
   }
 
   const needsTarget = selectingTarget || actionNeedsTarget || trapActivating;
@@ -296,9 +444,55 @@ const GameBoard: React.FC = () => {
               setZoomCard(menuCard);
               setMenuCard(null);
             }}
-            onMulligan={handleMulligan}
+            onMulligan={() => {
+              setMenuCard(null);
+              setMulliganUsed(true);
+              mulligan();
+            }}
             onClose={() => setMenuCard(null)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* TRAP MENIU — peržiūrėti / aktyvuoti (2 punktas) */}
+      <AnimatePresence>
+        {trapMenuTc && (
+          <TrapMenu
+            tc={trapMenuTc}
+            isMyTurn={isMyTurn}
+            actionUsed={actionUsed}
+            onInspect={() => handleTrapInspect(trapMenuTc)}
+            onActivate={() => handleTrapActivate(trapMenuTc)}
+            onClose={() => setTrapMenuTc(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* TRAP ZOOM */}
+      <AnimatePresence>
+        {trapZoom && (
+          <motion.div
+            className="card-menu-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setTrapZoom(null)}
+          >
+            <motion.div
+              className="zoom-card-wrapper"
+              initial={{ scale: 0.5 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.5 }}
+            >
+              <Card {...trapZoom.card} instanceId={trapZoom.id} />
+              <button
+                className="card-menu-close"
+                onClick={() => setTrapZoom(null)}
+              >
+                ✕
+              </button>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -330,7 +524,7 @@ const GameBoard: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* TAIKINYS */}
+      {/* TAIKINIO PASIRINKIMAS */}
       <AnimatePresence>
         {needsTarget && (
           <motion.div
@@ -432,6 +626,18 @@ const GameBoard: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* DISCARD MODALAS (3 punktas) */}
+      <AnimatePresence>
+        {showDiscardModal && (
+          <DiscardModal
+            discardPile={discardPile_}
+            opponents={opponents_}
+            mySocketId={mySocketId}
+            onClose={() => setShowDiscardModal(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* ĖJIMO JUOSTA */}
       <div className={`turn-bar ${isMyTurn ? "turn-bar--mine" : ""}`}>
         {isMyTurn
@@ -441,17 +647,21 @@ const GameBoard: React.FC = () => {
           : "Laukiame..."}
       </div>
 
-      {/* POKERIO STALAS */}
+      {/* POKERIO STALAS — visi žaidėjai (1 punktas) */}
       <div className="poker-table-wrap">
         <div className="poker-table">
           {/* CENTRAS */}
           <div className="table-center">
+            {/* Discard pile — paspaudžiamas (3 punktas) */}
             <div className="pile-wrap">
               <span className="pile-lbl">Išmesta ({discardPile_.length})</span>
-              <div className="discard-stack">
+              <div
+                className="discard-stack clickable"
+                onClick={() => setShowDiscardModal(true)}
+              >
                 {discardPile_.slice(-4).map((card, i) => (
                   <div
-                    key={card.instanceId}
+                    key={`${card.instanceId}-${i}`}
                     className="discard-mini"
                     style={{
                       background: typeBg[card.type] || "#eee",
@@ -467,6 +677,7 @@ const GameBoard: React.FC = () => {
               </div>
             </div>
 
+            {/* Kaladė */}
             <div className="pile-wrap">
               <span className="pile-lbl">Kaladė ({deckCount})</span>
               <div
@@ -488,25 +699,17 @@ const GameBoard: React.FC = () => {
             </div>
           </div>
 
-          {/* OPONENTAI */}
+          {/* VISI OPONENTAI aplink stalą (1 punktas) */}
           {otherPlayers.map((opp, i) => {
-            const total = otherPlayers.length;
-            const angle = total === 1 ? 270 : 180 + (i / (total - 1)) * 180;
-            const rad = angle * (Math.PI / 180);
-            const cx = 50 + 42 * Math.cos(rad);
-            const cy = 50 + 38 * Math.sin(rad);
             const isActive = currentTurnPlayerId === opp.id;
             const oppTraps = trapsByOwner(opp.id);
+            const pos = getSeatStyle(i, otherPlayers.length);
 
             return (
               <div
                 key={opp.id}
                 className={`player-seat ${isActive ? "player-seat--active" : ""} ${!opp.isConnected ? "player-seat--offline" : ""}`}
-                style={{
-                  left: `${cx}%`,
-                  top: `${cy}%`,
-                  transform: "translate(-50%, -50%)",
-                }}
+                style={pos}
               >
                 {oppTraps.length > 0 && (
                   <div className="seat-traps">
@@ -524,7 +727,6 @@ const GameBoard: React.FC = () => {
                 >
                   <PawnIcon size={20} />
                 </div>
-                {/* Mad Mouse mirksintis užrašas */}
                 {opp.madMousePending && (
                   <motion.div
                     className="mad-mouse-pending-badge"
@@ -544,18 +746,7 @@ const GameBoard: React.FC = () => {
         </div>
       </div>
 
-      {/* MAD MOUSE PENDING — mano */}
-      {iMadMousePending && (
-        <motion.div
-          className="my-mad-mouse-banner"
-          animate={{ opacity: [1, 0.5, 1] }}
-          transition={{ repeat: Infinity, duration: 0.9 }}
-        >
-          🐭 MAD MOUSE paskelbtas! Laukiame rato pabaigos...
-        </motion.div>
-      )}
-
-      {/* MANO TRAP KORTOS */}
+      {/* MANO TRAP KORTOS — su meniu (2 punktas) */}
       <AnimatePresence>
         {myTraps.length > 0 && (
           <motion.div
@@ -565,17 +756,14 @@ const GameBoard: React.FC = () => {
           >
             <span className="my-traps-lbl">🪤 Mano spąstai</span>
             {myTraps.map((tc) => (
-              <div key={tc.id} className="my-trap-chip">
+              <div
+                key={tc.id}
+                className="my-trap-chip"
+                onClick={() => handleTrapClick(tc)}
+              >
                 <div className="trap-face-down trap-face-down--sm" />
                 <span className="my-trap-name">{tc.card.title}</span>
-                {tc.canActivate && isMyTurn && !actionUsed && (
-                  <button
-                    className="btn-activate"
-                    onClick={() => handleActivateTrap(tc)}
-                  >
-                    Aktyvuoti
-                  </button>
-                )}
+                <span className="my-trap-hint">👆</span>
               </div>
             ))}
           </motion.div>
@@ -584,13 +772,12 @@ const GameBoard: React.FC = () => {
 
       {/* DEŠINĖ PANELĖ */}
       <div className="side-btns">
-        {/* Mad Mouse mygtukas */}
         {canDeclareWin && (
           <motion.button
             className="btn-mad-mouse"
             onClick={declareMadMouse}
             initial={{ scale: 0 }}
-            animate={{ scale: 1, rotate: [0, -5, 5, 0] }}
+            animate={{ scale: 1 }}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
@@ -603,6 +790,17 @@ const GameBoard: React.FC = () => {
         )}
       </div>
 
+      {/* MAD MOUSE BANNER */}
+      {iMadMousePending && (
+        <motion.div
+          className="my-mad-mouse-banner"
+          animate={{ opacity: [1, 0.5, 1] }}
+          transition={{ repeat: Infinity, duration: 0.9 }}
+        >
+          🐭 MAD MOUSE paskelbtas! Laukiame rato pabaigos...
+        </motion.div>
+      )}
+
       {/* RANKA */}
       <div className="hand-area">
         <div className="hand-header">
@@ -614,18 +812,9 @@ const GameBoard: React.FC = () => {
             </div>
             <span className="hand-lbl">
               Tu · {myCards_.length}/{handLimit || 10} 🃏
+              {iMadMousePending && " 🐭"}
             </span>
-            {iMadMousePending && (
-              <motion.span
-                className="hand-mad-mouse"
-                animate={{ opacity: [1, 0.3, 1] }}
-                transition={{ repeat: Infinity, duration: 0.8 }}
-              >
-                🐭
-              </motion.span>
-            )}
           </div>
-          {/* Action point indikatorius */}
           {isMyTurn && (
             <div
               className={`action-point ${actionUsed ? "action-point--used" : "action-point--available"}`}

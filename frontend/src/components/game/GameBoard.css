@@ -59,7 +59,7 @@
 .notification--mad_mouse {
   background: #1d4ed8;
   color: #fff;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
 /* ─── OVERLAYS ───────────────────────────────────────────────────────────────── */
@@ -96,6 +96,18 @@
   flex-direction: column;
   gap: 8px;
   width: 100%;
+}
+.trap-menu-title {
+  font-size: 0.75rem;
+  color: #a78bfa;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.trap-menu-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: white;
+  text-align: center;
 }
 .cmb {
   width: 100%;
@@ -153,12 +165,10 @@
   color: #475569;
   font-size: 1rem;
   cursor: pointer;
-  line-height: 1;
 }
 .card-menu-close:hover {
   color: white;
 }
-
 .zoom-card-wrapper {
   display: flex;
   flex-direction: column;
@@ -171,10 +181,8 @@
   transform-origin: center;
   margin: 50px 0;
 }
-.card-menu-overlay .zoom-card-wrapper .card {
-  transform: scale(2.2) !important;
-  transition: transform 0.3s ease-out;
-}
+
+/* MODAL */
 .modal {
   background: #0f172a;
   border: 1px solid #1e293b;
@@ -247,6 +255,69 @@
   max-height: 50vh;
   overflow-y: auto;
 }
+.empty-msg {
+  color: #475569;
+  font-size: 0.82rem;
+  padding: 16px;
+}
+
+/* DISCARD MODALAS */
+.discard-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 14px 0;
+  max-height: 55vh;
+  overflow-y: auto;
+  text-align: left;
+}
+.discard-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #0f172a;
+  border-left: 3px solid;
+}
+.discard-row--action {
+  border-color: #185fa5;
+}
+.discard-row--trap {
+  border-color: #6b21a8;
+}
+.discard-row--response {
+  border-color: #1d4ed8;
+}
+.discard-row--curse {
+  border-color: #991b1b;
+}
+.discard-num {
+  font-size: 0.65rem;
+  color: #475569;
+  min-width: 28px;
+  font-weight: 700;
+}
+.discard-type-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: currentColor;
+}
+.discard-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  flex: 1;
+  color: white;
+}
+.discard-type-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
 
 /* ─── ĖJIMO JUOSTA ───────────────────────────────────────────────────────────── */
 .turn-bar {
@@ -276,7 +347,7 @@
   }
 }
 
-/* ─── ACTION POINT INDIKATORIUS ──────────────────────────────────────────────── */
+/* ACTION POINT */
 .action-point {
   font-size: 0.65rem;
   font-weight: 800;
@@ -327,8 +398,7 @@
   border: 6px solid #1c0f07;
   box-shadow:
     0 0 0 2px #2d1810,
-    0 6px 32px rgba(0, 0, 0, 0.7),
-    inset 0 2px 6px rgba(255, 255, 255, 0.04);
+    0 6px 32px rgba(0, 0, 0, 0.7);
 }
 .table-center {
   position: absolute;
@@ -356,6 +426,8 @@
   font-size: 0.55rem;
   color: rgba(255, 255, 255, 0.2);
 }
+
+/* Discard stack — paspaudžiamas */
 .discard-stack {
   position: relative;
   width: 38px;
@@ -363,6 +435,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.discard-stack.clickable {
+  cursor: pointer;
+}
+.discard-stack.clickable:hover {
+  filter: brightness(1.2);
 }
 .discard-mini {
   position: absolute;
@@ -374,6 +452,7 @@
   left: 4px;
   opacity: 0.85;
 }
+
 .deck-stack {
   width: 38px;
   height: 52px;
@@ -460,18 +539,15 @@
   border-color: #3b82f6;
   color: #3b82f6;
 }
-
-/* Mad Mouse mirksintis badge */
 .mad-mouse-pending-badge {
-  font-size: 0.55rem;
+  font-size: 0.52rem;
   font-weight: 900;
   color: #fbbf24;
   background: #1c1000;
   border: 1px solid #ca8a04;
   border-radius: 6px;
-  padding: 2px 5px;
+  padding: 2px 4px;
   text-align: center;
-  letter-spacing: 0.04em;
 }
 .seat-name {
   font-size: 0.6rem;
@@ -503,7 +579,6 @@
   font-size: 0.78rem;
   font-weight: 800;
   color: #fbbf24;
-  letter-spacing: 0.04em;
 }
 
 /* ─── MANO TRAP KORTOS ───────────────────────────────────────────────────────── */
@@ -522,34 +597,29 @@
   color: #7c3aed;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 .my-trap-chip {
   display: flex;
   align-items: center;
   gap: 6px;
   background: #13082a;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-radius: 8px;
   border: 1px solid #4c1d95;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.my-trap-chip:hover {
+  border-color: #7c3aed;
 }
 .my-trap-name {
   font-size: 0.65rem;
   color: #a78bfa;
   font-weight: 700;
 }
-.btn-activate {
-  background: #6b21a8;
-  border: none;
-  color: white;
-  padding: 3px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.65rem;
-  font-weight: 800;
-}
-.btn-activate:hover {
-  background: #7c3aed;
+.my-trap-hint {
+  font-size: 0.6rem;
+  color: #6d28d9;
 }
 
 /* ─── DEŠINĖ PANELĖ ──────────────────────────────────────────────────────────── */
@@ -606,9 +676,6 @@
   font-size: 0.68rem;
   font-weight: 700;
   color: #64748b;
-}
-.hand-mad-mouse {
-  font-size: 1rem;
 }
 .hand-cards {
   display: flex;

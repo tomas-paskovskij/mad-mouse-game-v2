@@ -27,8 +27,6 @@ const HAND_LIMIT = 10;
 const WIN_CONDITION = 10;
 const STARTING_CARDS = 3;
 
-// ─── PAGALBINĖS FUNKCIJOS ─────────────────────────────────────────────────────
-
 const handlePlayerExit = (socketId, roomId = null) => {
   rooms.forEach((room) => {
     if (roomId && room.id !== roomId) return;
@@ -68,8 +66,6 @@ function createDeck() {
   return deck.sort(() => Math.random() - 0.5);
 }
 
-// ─── ŽAIDIMO LOGIKA ───────────────────────────────────────────────────────────
-
 function broadcastGameState(roomId) {
   const game = games[roomId];
   if (!game) return;
@@ -92,21 +88,18 @@ function broadcastGameState(roomId) {
         cardCount: p.cards.length,
         curses: p.curses || [],
         isConnected: p.isConnected !== false,
-        // Mad Mouse laukimo statusas
         madMousePending: p.madMousePending || false,
       })),
       currentTurnPlayerId: current ? current.id : null,
       deckCount: game.deck.length,
-      discardPile: game.discardPile.slice(-15),
+      discardPile: game.discardPile,
       tableCards: game.tableCards || [],
       winner: game.winner || null,
       pendingAction: game.pendingAction || null,
       turnNumber: game.turnNumber || 0,
       handLimit: HAND_LIMIT,
       phase: game.phase || "playing",
-      // Ar šiame ėjime jau panaudotas Action Point
       actionUsed: game.actionUsed || false,
-      // Kas yra Mad Mouse laukimo žaidėjas
       madMousePlayerId: game.madMousePlayerId || null,
       madMouseRoundEnd: game.madMouseRoundEnd || null,
     });
@@ -118,7 +111,6 @@ function processCursesOnTurnStart(roomId, playerId) {
   if (!game) return;
   const player = game.players.find((p) => p.id === playerId);
   if (!player || !player.curses) return;
-
   player.curses = player.curses.filter((curse) => {
     if (curse.effect === "curse_give_left") {
       const idx = game.players.findIndex((p) => p.id === playerId);
@@ -131,7 +123,7 @@ function processCursesOnTurnStart(roomId, playerId) {
         )[0];
         leftPlayer.cards.push(card);
         io.to(roomId).emit("game_notification", {
-          message: `💀 ${player.username} prakeikimas: atiduoda kortą ${leftPlayer.username}!`,
+          message: `💀 ${player.username} atiduoda kortą ${leftPlayer.username}!`,
           type: "curse",
         });
       }
@@ -154,14 +146,13 @@ function processTrapsOnTurnEnd(roomId) {
       tc.turnsLeft = (tc.turnsLeft || 2) - 1;
       if (tc.turnsLeft <= 0) {
         game.players.forEach((p) => {
-          if (p.cards.length > 0) {
+          if (p.cards.length > 0)
             game.discardPile.push(
               p.cards.splice(Math.floor(Math.random() * p.cards.length), 1)[0],
             );
-          }
         });
         io.to(roomId).emit("game_notification", {
-          message: "💥 Laiko bomba sprogo! Visi praranda po 1 kortą!",
+          message: "💥 Laiko bomba sprogo!",
           type: "trap",
         });
         return false;
@@ -171,19 +162,27 @@ function processTrapsOnTurnEnd(roomId) {
   });
 }
 
-function checkMadMouseWin(roomId) {
+// Mad Mouse laimėjimas — iškviečiamas kai ateina MAD MOUSE žaidėjo ėjimas
+function checkMadMouseWinOnTurn(roomId, currentPlayerId) {
   const game = games[roomId];
   if (!game || !game.madMousePlayerId) return false;
+  if (game.madMousePlayerId !== currentPlayerId) return false;
 
-  const madPlayer = game.players.find((p) => p.id === game.madMousePlayerId);
-  if (!madPlayer) {
-    game.madMousePlayerId = null;
-    return false;
-  }
+  const madPlayer = game.players.find((p) => p.id === currentPlayerId);
+  if (!madPlayer) return false;
 
-  // Jei žaidėjas nebeturi 10 kortų — atšaukiame
-  if (madPlayer.cards.length < WIN_CONDITION) {
+  // Jei vis dar turi 10+ kortų — laimi!
+  if (madPlayer.cards.length >= WIN_CONDITION) {
+    game.winner = madPlayer.username;
+    game.phase = "ended";
+    madPlayer.madMousePending = false;
+    io.to(roomId).emit("game_over", { winner: madPlayer.username });
+    broadcastGameState(roomId);
+    return true;
+  } else {
+    // Prarado kortų — atšaukiame
     game.madMousePlayerId = null;
+    game.madMouseRoundEnd = null;
     madPlayer.madMousePending = false;
     io.to(roomId).emit("game_notification", {
       message: `❌ ${madPlayer.username} nebeturi 10 kortų — Mad Mouse atšauktas!`,
@@ -192,25 +191,21 @@ function checkMadMouseWin(roomId) {
     broadcastGameState(roomId);
     return false;
   }
+}
 
-  // Patikriname ar ratas baigėsi (visi žaidėjai padarė ėjimą po Mad Mouse)
-  if (game.turnNumber >= game.madMouseRoundEnd) {
-    // Dar kartą tikriname ar vis dar turi 10 kortų
-    if (madPlayer.cards.length >= WIN_CONDITION) {
-      game.winner = madPlayer.username;
-      game.phase = "ended";
-      madPlayer.madMousePending = false;
-      io.to(roomId).emit("game_over", { winner: madPlayer.username });
-      broadcastGameState(roomId);
-      return true;
-    } else {
-      game.madMousePlayerId = null;
-      madPlayer.madMousePending = false;
-      broadcastGameState(roomId);
-      return false;
-    }
+function checkMadMouseAfterAction(roomId) {
+  const game = games[roomId];
+  if (!game || !game.madMousePlayerId) return;
+  const madPlayer = game.players.find((p) => p.id === game.madMousePlayerId);
+  if (madPlayer && madPlayer.cards.length < WIN_CONDITION) {
+    madPlayer.madMousePending = false;
+    game.madMousePlayerId = null;
+    game.madMouseRoundEnd = null;
+    io.to(roomId).emit("game_notification", {
+      message: `❌ ${madPlayer.username} nebeturi 10 kortų — Mad Mouse atšauktas!`,
+      type: "skip",
+    });
   }
-  return false;
 }
 
 function nextTurn(roomId) {
@@ -219,7 +214,6 @@ function nextTurn(roomId) {
 
   processTrapsOnTurnEnd(roomId);
 
-  // Einame į sekantį prisijungusį žaidėją
   let attempts = 0;
   do {
     game.currentTurnIndex = (game.currentTurnIndex + 1) % game.players.length;
@@ -230,14 +224,14 @@ function nextTurn(roomId) {
   );
 
   game.turnNumber = (game.turnNumber || 0) + 1;
-  game.actionUsed = false; // Naujas ėjimas — Action Point atstatytas
+  game.actionUsed = false;
 
   const current = game.players[game.currentTurnIndex];
 
   processCursesOnTurnStart(roomId, current.id);
 
-  // Tikriname Mad Mouse laimėjimą
-  if (checkMadMouseWin(roomId)) return;
+  // Tikriname ar šis žaidėjas yra Mad Mouse laukėjas
+  if (checkMadMouseWinOnTurn(roomId, current.id)) return;
 
   if (current.skippedTurns > 0) {
     current.skippedTurns--;
@@ -254,7 +248,6 @@ function nextTurn(roomId) {
     type: "turn",
     playerId: current.id,
   });
-
   broadcastGameState(roomId);
 }
 
@@ -263,15 +256,12 @@ function checkTraps(roomId, triggerType, initiatorId, targetId) {
   if (!game) return false;
   const target = targetId ? game.players.find((p) => p.id === targetId) : null;
   if (!target) return false;
-
   const matchingTrap = (game.tableCards || []).find(
     (tc) => tc.ownerId === targetId && tc.card.trigger === triggerType,
   );
   if (!matchingTrap) return false;
-
   game.tableCards = game.tableCards.filter((tc) => tc !== matchingTrap);
   const initiator = game.players.find((p) => p.id === initiatorId);
-
   switch (matchingTrap.card.effect) {
     case "trap_steal_punish": {
       const lost = initiator.cards.splice(
@@ -279,11 +269,7 @@ function checkTraps(roomId, triggerType, initiatorId, targetId) {
         Math.min(2, initiator.cards.length),
       );
       game.discardPile.push(...lost);
-      // Tikriname ar Mad Mouse atšaukiamas
-      if (initiator.madMousePending && initiator.cards.length < WIN_CONDITION) {
-        initiator.madMousePending = false;
-        game.madMousePlayerId = null;
-      }
+      checkMadMouseAfterAction(roomId);
       io.to(roomId).emit("game_notification", {
         message: `🪤 Pelėkautai! ${initiator.username} praranda ${lost.length} kortas!`,
         type: "trap",
@@ -299,13 +285,12 @@ function checkTraps(roomId, triggerType, initiatorId, targetId) {
     }
     case "trap_reflect": {
       io.to(roomId).emit("game_notification", {
-        message: `🔄 ${target.username} atspindi veiksmą į ${initiator.username}!`,
+        message: `🔄 ${target.username} atspindi veiksmą!`,
         type: "trap",
       });
       return "reflect";
     }
   }
-
   broadcastGameState(roomId);
   return true;
 }
@@ -313,7 +298,6 @@ function checkTraps(roomId, triggerType, initiatorId, targetId) {
 function executeEffect(roomId, initiatorId, card, targetId, extraData) {
   const game = games[roomId];
   if (!game) return;
-
   const initiator = game.players.find((p) => p.id === initiatorId);
   const target = targetId ? game.players.find((p) => p.id === targetId) : null;
 
@@ -335,7 +319,6 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
     const trap = checkTraps(roomId, "on_steal_target", initiatorId, targetId);
     if (trap === true) {
       broadcastGameState(roomId);
-      checkMadMouseWin(roomId);
       return;
     }
     if (trap === "reflect") {
@@ -343,7 +326,6 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
       return;
     }
   }
-
   if (card.type === "action" && targetId) {
     const trap = checkTraps(roomId, "on_action_target", initiatorId, targetId);
     if (trap === "reflect") {
@@ -353,24 +335,9 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
   }
 
   function drawCards(player, count) {
-    let drawn = 0;
     for (let i = 0; i < count; i++) {
-      if (game.deck.length > 0 && player.cards.length < HAND_LIMIT) {
+      if (game.deck.length > 0 && player.cards.length < HAND_LIMIT)
         player.cards.push(game.deck.pop());
-        drawn++;
-      }
-    }
-    return drawn;
-  }
-
-  function checkMadMouseAfterSteal(player) {
-    if (player.madMousePending && player.cards.length < WIN_CONDITION) {
-      player.madMousePending = false;
-      game.madMousePlayerId = null;
-      io.to(roomId).emit("game_notification", {
-        message: `❌ ${player.username} nebeturi 10 kortų — Mad Mouse atšauktas!`,
-        type: "skip",
-      });
     }
   }
 
@@ -400,9 +367,9 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
       all
         .sort(() => Math.random() - 0.5)
         .forEach((c, i) => game.players[i % game.players.length].cards.push(c));
-      game.players.forEach((p) => checkMadMouseAfterSteal(p));
+      checkMadMouseAfterAction(roomId);
       io.to(roomId).emit("game_notification", {
-        message: "🌀 Chaosas! Kortos padalintos iš naujo!",
+        message: "🌀 Chaosas!",
         type: "action",
       });
       break;
@@ -411,7 +378,7 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
       if (!target) break;
       target.skippedTurns = (target.skippedTurns || 0) + 1;
       io.to(roomId).emit("game_notification", {
-        message: `⏭ ${target.username} privalės praleisti ėjimą!`,
+        message: `⏭ ${target.username} praleips ėjimą!`,
         type: "action",
       });
       break;
@@ -434,7 +401,7 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
       if (!target) break;
       drawCards(target, 2);
       io.to(roomId).emit("game_notification", {
-        message: `${target.username} privalo patraukti 2 kortas!`,
+        message: `${target.username} traukia 2 kortas!`,
         type: "action",
       });
       break;
@@ -442,7 +409,7 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
     case "all_draw_one": {
       game.players.forEach((p) => drawCards(p, 1));
       io.to(roomId).emit("game_notification", {
-        message: "Visi patraukia po 1 kortą!",
+        message: "Visi traukia po 1 kortą!",
         type: "action",
       });
       break;
@@ -455,9 +422,9 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
           1,
         )[0],
       );
-      checkMadMouseAfterSteal(target);
+      checkMadMouseAfterAction(roomId);
       io.to(roomId).emit("game_notification", {
-        message: `${target.username} privalo išmesti 1 kortą!`,
+        message: `${target.username} išmeta 1 kortą!`,
         type: "action",
       });
       break;
@@ -470,12 +437,12 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
       if (ci === -1) break;
       if (target.cards.length < HAND_LIMIT) {
         target.cards.push(initiator.cards.splice(ci, 1)[0]);
-        checkMadMouseAfterSteal(initiator);
-        io.to(roomId).emit("game_notification", {
-          message: `${initiator.username} padovanojo kortą ${target.username}!`,
-          type: "action",
-        });
+        checkMadMouseAfterAction(roomId);
       }
+      io.to(roomId).emit("game_notification", {
+        message: `${initiator.username} dovanoja kortą ${target.username}!`,
+        type: "action",
+      });
       break;
     }
     case "return_draw_two": {
@@ -489,18 +456,18 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
       }
       drawCards(initiator, 2);
       io.to(roomId).emit("game_notification", {
-        message: `${initiator.username} grąžino kortą ir patraukė 2!`,
+        message: `${initiator.username} grąžino ir patraukė 2!`,
         type: "action",
       });
       break;
     }
     case "pass_left": {
-      const cards = game.players.map((p) =>
+      const cs = game.players.map((p) =>
         p.cards.length > 0
           ? p.cards.splice(Math.floor(Math.random() * p.cards.length), 1)[0]
           : null,
       );
-      cards.forEach((c, i) => {
+      cs.forEach((c, i) => {
         if (c) {
           const li = (i - 1 + game.players.length) % game.players.length;
           if (game.players[li].cards.length < HAND_LIMIT)
@@ -508,20 +475,20 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
           else game.discardPile.push(c);
         }
       });
-      game.players.forEach((p) => checkMadMouseAfterSteal(p));
+      checkMadMouseAfterAction(roomId);
       io.to(roomId).emit("game_notification", {
-        message: "Visi perduoda po 1 kortą kairėje!",
+        message: "Visi perduoda kortą kairėje!",
         type: "action",
       });
       break;
     }
     case "pass_right": {
-      const cards = game.players.map((p) =>
+      const cs = game.players.map((p) =>
         p.cards.length > 0
           ? p.cards.splice(Math.floor(Math.random() * p.cards.length), 1)[0]
           : null,
       );
-      cards.forEach((c, i) => {
+      cs.forEach((c, i) => {
         if (c) {
           const ri = (i + 1) % game.players.length;
           if (game.players[ri].cards.length < HAND_LIMIT)
@@ -529,9 +496,9 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
           else game.discardPile.push(c);
         }
       });
-      game.players.forEach((p) => checkMadMouseAfterSteal(p));
+      checkMadMouseAfterAction(roomId);
       io.to(roomId).emit("game_notification", {
-        message: "Visi perduoda po 1 kortą dešinėje!",
+        message: "Visi perduoda kortą dešinėje!",
         type: "action",
       });
       break;
@@ -540,55 +507,52 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
       game.deck.sort(() => Math.random() - 0.5);
       drawCards(initiator, 1);
       io.to(roomId).emit("game_notification", {
-        message: `${initiator.username} sumaišė kaladę ir patraukė kortą!`,
+        message: `${initiator.username} sumaišė ir patraukė!`,
         type: "action",
       });
       break;
     }
     case "tax_richest": {
-      const richest = game.players.reduce((a, b) =>
+      const r = game.players.reduce((a, b) =>
         a.cards.length > b.cards.length ? a : b,
       );
       if (
-        richest.id !== initiatorId &&
-        richest.cards.length > 0 &&
+        r.id !== initiatorId &&
+        r.cards.length > 0 &&
         initiator.cards.length < HAND_LIMIT
       ) {
         initiator.cards.push(
-          richest.cards.splice(
-            Math.floor(Math.random() * richest.cards.length),
-            1,
-          )[0],
+          r.cards.splice(Math.floor(Math.random() * r.cards.length), 1)[0],
         );
-        checkMadMouseAfterSteal(richest);
-        io.to(roomId).emit("game_notification", {
-          message: `${initiator.username} pasiima kortą iš ${richest.username}!`,
-          type: "action",
-        });
+        checkMadMouseAfterAction(roomId);
       }
+      io.to(roomId).emit("game_notification", {
+        message: `${initiator.username} pasiima iš ${r.username}!`,
+        type: "action",
+      });
       break;
     }
     case "help_poorest": {
-      const poorest = game.players.reduce((a, b) =>
+      const po = game.players.reduce((a, b) =>
         a.cards.length < b.cards.length ? a : b,
       );
-      drawCards(poorest, 2);
+      drawCards(po, 2);
       io.to(roomId).emit("game_notification", {
-        message: `${poorest.username} gauna 2 papildomas kortas!`,
+        message: `${po.username} gauna 2 kortas!`,
         type: "action",
       });
       break;
     }
     case "amnesia": {
       if (!target) break;
-      const count = target.cards.length;
+      const cnt = target.cards.length;
       game.deck.push(...target.cards);
       target.cards = [];
       game.deck.sort(() => Math.random() - 0.5);
-      drawCards(target, count);
-      checkMadMouseAfterSteal(target);
+      drawCards(target, cnt);
+      checkMadMouseAfterAction(roomId);
       io.to(roomId).emit("game_notification", {
-        message: `${target.username} užmiršta viską ir traukia iš naujo!`,
+        message: `${target.username} užmiršta viską!`,
         type: "action",
       });
       break;
@@ -602,23 +566,22 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
             1,
           )[0],
         );
-        checkMadMouseAfterSteal(target);
-        io.to(roomId).emit("game_notification", {
-          message: `🗡 ${initiator.username} pavogė kortą iš ${target.username}!`,
-          type: "action",
-        });
+        checkMadMouseAfterAction(roomId);
       }
+      io.to(roomId).emit("game_notification", {
+        message: `🗡 ${initiator.username} pavogė kortą iš ${target.username}!`,
+        type: "action",
+      });
       break;
     }
     case "swap_hands": {
       if (!target) break;
-      const temp = initiator.cards;
+      const tmp = initiator.cards;
       initiator.cards = target.cards;
-      target.cards = temp;
-      checkMadMouseAfterSteal(initiator);
-      checkMadMouseAfterSteal(target);
+      target.cards = tmp;
+      checkMadMouseAfterAction(roomId);
       io.to(roomId).emit("game_notification", {
-        message: `🔄 ${initiator.username} ir ${target.username} apsikeičia kortomis!`,
+        message: `🔄 ${initiator.username} ir ${target.username} apsikeičia!`,
         type: "action",
       });
       break;
@@ -639,11 +602,11 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
       break;
     }
     case "mass_swap": {
-      const swapped = game.players.map((p) => [...p.cards]);
+      const sw = game.players.map((p) => [...p.cards]);
       game.players.forEach((p, i) => {
-        p.cards = swapped[(i - 1 + game.players.length) % game.players.length];
+        p.cards = sw[(i - 1 + game.players.length) % game.players.length];
       });
-      game.players.forEach((p) => checkMadMouseAfterSteal(p));
+      checkMadMouseAfterAction(roomId);
       io.to(roomId).emit("game_notification", {
         message: "🔄 Didysis apsimainymas!",
         type: "action",
@@ -660,9 +623,9 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
           initiator.cards.push(
             p.cards.splice(Math.floor(Math.random() * p.cards.length), 1)[0],
           );
-          checkMadMouseAfterSteal(p);
         }
       });
+      checkMadMouseAfterAction(roomId);
       io.to(roomId).emit("game_notification", {
         message: `🗡 ${initiator.username} apvogė visus!`,
         type: "action",
@@ -679,7 +642,7 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
     }
     case "delay_action": {
       io.to(roomId).emit("game_notification", {
-        message: `⏱ ${initiator.username} atidėjo veiksmą!`,
+        message: `⏱ Veiksmas atidėtas!`,
         type: "response",
       });
       break;
@@ -697,7 +660,7 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
         turnsLeft: 2,
       });
       io.to(roomId).emit("game_notification", {
-        message: `💀 ${target.username} prakeiktas — praleidžia 2 ėjimus!`,
+        message: `💀 ${target.username} praleips 2 ėjimus!`,
         type: "curse",
       });
       break;
@@ -772,7 +735,7 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
       if (!target) break;
       drawCards(target, 3);
       io.to(roomId).emit("game_notification", {
-        message: `💀 ${target.username} privalo patraukti 3 kortas!`,
+        message: `💀 ${target.username} traukia 3 kortas!`,
         type: "curse",
       });
       break;
@@ -782,12 +745,12 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
     case "trap_guard":
     case "trap_mimic": {
       if (!game.tableCards) game.tableCards = [];
-      const trapCount = game.tableCards.filter(
+      const tc2 = game.tableCards.filter(
         (tc) => tc.ownerId === initiatorId && tc.card.type === "trap",
       ).length;
-      if (trapCount >= 3) {
+      if (tc2 >= 3) {
         const s = io.sockets.sockets.get(initiatorId);
-        if (s) s.emit("error_message", "Max 3 trap kortos!");
+        if (s) s.emit("error_message", "Max 3 trap!");
         initiator.cards.push(card);
         break;
       }
@@ -807,12 +770,12 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
     }
     case "trap_lose_card": {
       if (!game.tableCards) game.tableCards = [];
-      const trapCount = game.tableCards.filter(
+      const tc3 = game.tableCards.filter(
         (tc) => tc.ownerId === initiatorId && tc.card.type === "trap",
       ).length;
-      if (trapCount >= 3) {
+      if (tc3 >= 3) {
         const s = io.sockets.sockets.get(initiatorId);
-        if (s) s.emit("error_message", "Max 3 trap kortos!");
+        if (s) s.emit("error_message", "Max 3 trap!");
         initiator.cards.push(card);
         break;
       }
@@ -852,10 +815,7 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
   }
 
   broadcastGameState(roomId);
-  checkMadMouseWin(roomId);
 }
-
-// ─── SOCKET EVENTS ────────────────────────────────────────────────────────────
 
 io.on("connection", (socket) => {
   console.log("Prisijungė:", socket.id);
@@ -915,7 +875,6 @@ io.on("connection", (socket) => {
     handlePlayerExit(socket.id, roomId);
     socket.leave(roomId);
   });
-
   socket.on("toggle_ready", (roomId) => {
     const room = rooms.find((r) => r.id === roomId);
     if (!room) return;
@@ -925,7 +884,6 @@ io.on("connection", (socket) => {
       emitRoomUpdate(roomId);
     }
   });
-
   socket.on("kick_player", (data) => {
     const { roomId, playerId } = data;
     const room = rooms.find((r) => r.id === roomId);
@@ -942,7 +900,6 @@ io.on("connection", (socket) => {
     }
     emitRoomUpdate(roomId);
   });
-
   socket.on("update_room_settings", (data) => {
     const { roomId, newName, newMaxPlayers } = data;
     const room = rooms.find((r) => r.id === roomId);
@@ -993,12 +950,11 @@ io.on("connection", (socket) => {
       madMouseRoundEnd: null,
     };
 
-    // Kiekvienas žaidėjas gauna STARTING_CARDS kortų
+    // Kiekvienas gauna STARTING_CARDS kortų
     gamePlayers.forEach((player) => {
       for (let i = 0; i < STARTING_CARDS; i++) {
-        if (games[roomId].deck.length > 0) {
+        if (games[roomId].deck.length > 0)
           player.cards.push(games[roomId].deck.pop());
-        }
       }
       const s = io.sockets.sockets.get(player.id);
       if (s) s.emit("starting_cards", player.cards);
@@ -1007,16 +963,12 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("game_started", { firstPlayerId: gamePlayers[0].id });
     broadcastGameState(roomId);
     io.to(roomId).emit("game_notification", {
-      message: `🐭 Žaidimas prasidėjo! Kiekvienas gauna ${STARTING_CARDS} kortas. ${gamePlayers[0].username} ėjimas.`,
+      message: `🐭 Žaidimas prasidėjo! Kiekvienas gauna ${STARTING_CARDS} kortas.`,
       type: "turn",
       playerId: gamePlayers[0].id,
     });
-    console.log(
-      `Žaidimas: ${roomId}, kaladėje ${games[roomId].deck.length} kortų`,
-    );
   });
 
-  // Mulligan
   socket.on("mulligan", (roomId) => {
     const game = games[roomId];
     if (!game || game.turnNumber > 0) return;
@@ -1038,13 +990,11 @@ io.on("connection", (socket) => {
     broadcastGameState(roomId);
   });
 
-  // Mad Mouse paskelbimas
   socket.on("declare_mad_mouse", (roomId) => {
     const game = games[roomId];
     if (!game || game.winner) return;
     const player = game.players.find((p) => p.id === socket.id);
     if (!player) return;
-
     if (player.cards.length < WIN_CONDITION)
       return socket.emit("error_message", `Dar neturi ${WIN_CONDITION} kortų!`);
     if (game.madMousePlayerId)
@@ -1055,13 +1005,13 @@ io.on("connection", (socket) => {
 
     player.madMousePending = true;
     game.madMousePlayerId = socket.id;
-    // Laimėjimas po viso rato (visi žaidėjai padaro ėjimą)
+    // Laimėjimas kai ateina šio žaidėjo ėjimas vėl
     game.madMouseRoundEnd =
       game.turnNumber +
       game.players.filter((p) => p.isConnected !== false).length;
 
     io.to(roomId).emit("game_notification", {
-      message: `🐭 ${player.username} paskelbė MAD MOUSE! Visi turi šansą sustabdyti!`,
+      message: `🐭 ${player.username} paskelbė MAD MOUSE! Laukiama rato!`,
       type: "mad_mouse",
     });
     broadcastGameState(roomId);
@@ -1080,7 +1030,7 @@ io.on("connection", (socket) => {
     const card = player.cards[cardIdx];
     const isMyTurn = game.players[game.currentTurnIndex].id === socket.id;
 
-    // Response kortos — bet kada, nenaudoja Action Point
+    // Response — bet kada
     if (card.isLightning && card.type === "response") {
       player.cards.splice(cardIdx, 1);
       game.discardPile.push(card);
@@ -1112,7 +1062,7 @@ io.on("connection", (socket) => {
       if (card.effect === "delay_action" && game.pendingAction) {
         game.pendingAction = null;
         io.to(roomId).emit("game_notification", {
-          message: `⏱ ${player.username} atidėjo veiksmą!`,
+          message: `⏱ Veiksmas atidėtas!`,
           type: "response",
         });
         broadcastGameState(roomId);
@@ -1123,12 +1073,8 @@ io.on("connection", (socket) => {
 
     if (!isMyTurn) return socket.emit("error_message", "Ne tavo ėjimas!");
     if (game.actionUsed)
-      return socket.emit(
-        "error_message",
-        "Jau panaudojai savo veiksmą šiame ėjime!",
-      );
+      return socket.emit("error_message", "Jau panaudojai veiksmą!");
 
-    // Išmesti kortą į discard
     if (extraData?.discard) {
       player.cards.splice(cardIdx, 1);
       game.discardPile.push(card);
@@ -1138,22 +1084,15 @@ io.on("connection", (socket) => {
         type: "action",
       });
       broadcastGameState(roomId);
-      // Automatiškai baigiame ėjimą
-      nextTurn(roomId);
+      setTimeout(() => {
+        if (games[roomId] && !games[roomId].winner) nextTurn(roomId);
+      }, 800);
       return;
     }
 
     player.cards.splice(cardIdx, 1);
     if (card.type !== "trap") game.discardPile.push(card);
-
-    // Action ir Curse — baigia ėjimą
-    if (card.type === "action" || card.type === "curse") {
-      game.actionUsed = true;
-    }
-    // Trap — taip pat baigia ėjimą
-    if (card.type === "trap") {
-      game.actionUsed = true;
-    }
+    game.actionUsed = true;
 
     if (card.requiresTarget && !targetId) {
       game.pendingAction = { card, initiatorId: socket.id };
@@ -1167,8 +1106,7 @@ io.on("connection", (socket) => {
 
     executeEffect(roomId, socket.id, card, targetId || null, extraData || null);
 
-    // Automatiškai baigiame ėjimą po kortų panaudojimo
-    if (game.actionUsed && !game.pendingAction) {
+    if (!game.pendingAction) {
       setTimeout(() => {
         if (games[roomId] && !games[roomId].winner) nextTurn(roomId);
       }, 1200);
@@ -1180,6 +1118,8 @@ io.on("connection", (socket) => {
     const game = games[roomId];
     if (!game || game.winner) return;
     if (game.players[game.currentTurnIndex].id !== socket.id) return;
+    if (game.actionUsed)
+      return socket.emit("error_message", "Jau panaudojai veiksmą!");
     const tc = (game.tableCards || []).find(
       (t) => t.id === tableCardId && t.ownerId === socket.id,
     );
@@ -1194,9 +1134,9 @@ io.on("connection", (socket) => {
             1,
           )[0],
         );
-        checkMadMouseWin(roomId);
+        checkMadMouseAfterAction(roomId);
         io.to(roomId).emit("game_notification", {
-          message: `🪤 Spąstai! ${target.username} praranda 1 kortą!`,
+          message: `🪤 Spąstai! ${target.username} praranda kortą!`,
           type: "trap",
         });
       }
@@ -1216,7 +1156,7 @@ io.on("connection", (socket) => {
     const { card } = game.pendingAction;
     game.pendingAction = null;
     executeEffect(roomId, socket.id, card, targetId, extraData || null);
-    if (game.actionUsed && !game.pendingAction) {
+    if (!game.pendingAction) {
       setTimeout(() => {
         if (games[roomId] && !games[roomId].winner) nextTurn(roomId);
       }, 1200);
@@ -1233,7 +1173,7 @@ io.on("connection", (socket) => {
     const ci = target.cards.findIndex((c) => c.instanceId === cardInstanceId);
     if (ci === -1) return;
     initiator.cards.push(target.cards.splice(ci, 1)[0]);
-    checkMadMouseWin(roomId);
+    checkMadMouseAfterAction(roomId);
     io.to(roomId).emit("game_notification", {
       message: `${initiator.username} pasiima kortą iš ${target.username}!`,
       type: "action",
@@ -1244,7 +1184,6 @@ io.on("connection", (socket) => {
     }, 1200);
   });
 
-  // Trauk kortą = ėjimas baigtas
   socket.on("draw_card", (roomId) => {
     const game = games[roomId];
     if (!game || game.winner) return;
@@ -1252,7 +1191,7 @@ io.on("connection", (socket) => {
     if (current.id !== socket.id)
       return socket.emit("error_message", "Ne tavo ėjimas!");
     if (game.actionUsed)
-      return socket.emit("error_message", "Jau panaudojai savo veiksmą!");
+      return socket.emit("error_message", "Jau panaudojai veiksmą!");
     if (game.deck.length === 0)
       return socket.emit("error_message", "Kaladė tuščia!");
     if (current.cards.length >= HAND_LIMIT)
@@ -1265,17 +1204,15 @@ io.on("connection", (socket) => {
     if (hasBadDraw) {
       game.discardPile.push(card);
       io.to(roomId).emit("game_notification", {
-        message: `💀 Prakeikimas: patraukta korta išmesta!`,
+        message: `💀 Prakeikimas: korta išmesta!`,
         type: "curse",
       });
     } else {
       current.cards.push(card);
       socket.emit("receive_card", card);
     }
-
     game.actionUsed = true;
     broadcastGameState(roomId);
-    // Trauk kortą = ėjimas baigtas
     setTimeout(() => {
       if (games[roomId] && !games[roomId].winner) nextTurn(roomId);
     }, 800);
@@ -1284,8 +1221,7 @@ io.on("connection", (socket) => {
   socket.on("end_turn", (roomId) => {
     const game = games[roomId];
     if (!game || game.winner) return;
-    if (game.players[game.currentTurnIndex].id !== socket.id)
-      return socket.emit("error_message", "Ne tavo ėjimas!");
+    if (game.players[game.currentTurnIndex].id !== socket.id) return;
     nextTurn(roomId);
   });
 
@@ -1314,9 +1250,8 @@ io.on("connection", (socket) => {
         if (
           game.players[game.currentTurnIndex].id === socket.id &&
           !game.winner
-        ) {
+        )
           setTimeout(() => nextTurn(roomId), 2000);
-        }
       }
     });
     handlePlayerExit(socket.id);
