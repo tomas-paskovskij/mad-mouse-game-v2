@@ -15,8 +15,8 @@ const PawnIcon = ({ size = 24 }: { size?: number }) => (
   </svg>
 );
 
-// Kortos veiksmu meniu
-interface CardMenuProps {
+// ─── KORTOS MENIU ─────────────────────────────────────────────────────────────
+const CardActionMenu: React.FC<{
   card: CardType;
   isMyTurn: boolean;
   actionUsed: boolean;
@@ -28,9 +28,7 @@ interface CardMenuProps {
   onInspect: () => void;
   onMulligan: () => void;
   onClose: () => void;
-}
-
-const CardActionMenu: React.FC<CardMenuProps> = ({
+}> = ({
   card,
   isMyTurn,
   actionUsed,
@@ -48,7 +46,6 @@ const CardActionMenu: React.FC<CardMenuProps> = ({
     (card.isLightning &&
       card.type === "response" &&
       (card.effect === "shield" || pendingAction !== null));
-  const canMulligan = turnNumber === 0 && !mulliganUsed;
   return (
     <motion.div
       className="card-menu-overlay"
@@ -76,7 +73,7 @@ const CardActionMenu: React.FC<CardMenuProps> = ({
               ▶ Panaudoti
             </button>
           )}
-          {canMulligan && (
+          {turnNumber === 0 && !mulliganUsed && (
             <button className="cmb cmb--mulligan" onClick={onMulligan}>
               🔀 Mulligan
             </button>
@@ -95,24 +92,15 @@ const CardActionMenu: React.FC<CardMenuProps> = ({
   );
 };
 
-// Trap kortos meniu (peržiūrėti / aktyvuoti)
-interface TrapMenuProps {
+// ─── TRAP MENIU (2 punktas) ────────────────────────────────────────────────────
+const TrapMenu: React.FC<{
   tc: TableCard;
   isMyTurn: boolean;
   actionUsed: boolean;
   onInspect: () => void;
   onActivate: () => void;
   onClose: () => void;
-}
-
-const TrapMenu: React.FC<TrapMenuProps> = ({
-  tc,
-  isMyTurn,
-  actionUsed,
-  onInspect,
-  onActivate,
-  onClose,
-}) => (
+}> = ({ tc, isMyTurn, actionUsed, onInspect, onActivate, onClose }) => (
   <motion.div
     className="card-menu-overlay"
     initial={{ opacity: 0 }}
@@ -146,21 +134,17 @@ const TrapMenu: React.FC<TrapMenuProps> = ({
   </motion.div>
 );
 
-// Discard pile modalas
-interface DiscardModalProps {
-  discardPile: CardType[];
-  opponents: any[];
-  mySocketId: string | null;
-  onClose: () => void;
-}
-
-const DiscardModal: React.FC<DiscardModalProps> = ({
+// ─── DISCARD MODALAS su savininku (4 punktas) ─────────────────────────────────
+const DiscardModal: React.FC<{ discardPile: any[]; onClose: () => void }> = ({
   discardPile,
-  opponents,
-  mySocketId,
   onClose,
 }) => {
-  // Discard pile neturi savininko info — rodome tik kortas su tipu ir pavadinimu
+  const typeColor: Record<string, string> = {
+    action: "#185FA5",
+    trap: "#6B21A8",
+    response: "#1D4ED8",
+    curse: "#991B1B",
+  };
   return (
     <motion.div
       className="overlay"
@@ -183,12 +167,21 @@ const DiscardModal: React.FC<DiscardModalProps> = ({
           {[...discardPile].reverse().map((card, i) => (
             <div
               key={`${card.instanceId}-${i}`}
-              className={`discard-row discard-row--${card.type}`}
+              className="discard-row"
+              style={{ borderColor: typeColor[card.type] || "#555" }}
             >
               <span className="discard-num">#{discardPile.length - i}</span>
-              <span className="discard-type-dot" />
               <span className="discard-title">{card.title}</span>
-              <span className="discard-type-label">{card.type}</span>
+              {/* Savininkas (4 punktas) */}
+              <span className="discard-owner">
+                👤 {card.ownerUsername || "?"}
+              </span>
+              <span
+                className="discard-type-label"
+                style={{ color: typeColor[card.type] }}
+              >
+                {card.type}
+              </span>
             </div>
           ))}
         </div>
@@ -200,7 +193,7 @@ const DiscardModal: React.FC<DiscardModalProps> = ({
   );
 };
 
-// ─── PAGRINDINĖ KOMPONENTA ────────────────────────────────────────────────────
+// ─── PAGRINDINIS KOMPONENTAS ──────────────────────────────────────────────────
 const GameBoard: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
@@ -216,13 +209,13 @@ const GameBoard: React.FC = () => {
     winner,
     turnNumber,
     handLimit,
-    phase,
     notification,
     inspectResult,
     inspectStealResult,
     actionNeedsTarget,
     actionUsed,
     madMousePlayerId,
+    reactionWindow,
     mySocketId,
     initGame,
     playCard,
@@ -234,6 +227,8 @@ const GameBoard: React.FC = () => {
     declareMadMouse,
     mulligan,
     restartGame,
+    passReaction,
+    activateTrapReaction,
     clearInspect,
     clearInspectSteal,
     clearActionNeedsTarget,
@@ -253,6 +248,16 @@ const GameBoard: React.FC = () => {
   }, [roomId]);
 
   const myCards_ = myCards || [];
+  const reactionTimeLeft = reactionWindow
+    ? Math.max(
+        0,
+        Math.round(
+          (reactionWindow.durationMs -
+            (Date.now() - reactionWindow.startedAt)) /
+            1000,
+        ),
+      )
+    : 0;
   const opponents_ = opponents || [];
   const tableCards_ = tableCards || [];
   const discardPile_ = discardPile || [];
@@ -261,42 +266,37 @@ const GameBoard: React.FC = () => {
   const iMadMousePending = madMousePlayerId === mySocketId;
   const canDeclareWin =
     myCards_.length >= (handLimit || 10) && !madMousePlayerId;
+  const visualLayers = Math.min(Math.floor(deckCount / 4), 12);
 
-  // VISI žaidėjai — aš + kiti (1 punktas)
-  const me = {
-    id: mySocketId,
+  // Visi žaidėjai — aš + oponentai (5 punktas)
+  const myInfo = opponents_.find((o) => o.id === socket.id) || {
+    id: mySocketId || "",
     username: "Tu",
     cardCount: myCards_.length,
     madMousePending: iMadMousePending,
-    isMe: true,
     isConnected: true,
     curses: [],
   };
-  const allPlayers = [
-    me,
-    ...opponents_
-      .filter((o) => o.id !== socket.id)
-      .map((o) => ({ ...o, isMe: false })),
-  ];
   const otherPlayers = opponents_.filter((o) => o.id !== socket.id);
 
-  const myTraps = tableCards_.filter(
-    (tc) => tc.ownerId === mySocketId && tc.card.type === "trap",
-  );
-  const visualLayers = Math.min(Math.floor(deckCount / 4), 12);
+  // VISI žaidėjai aplink stalą — aš viršuje centre, kiti aplinkui (5 punktas)
+  // Aš — visada pozicija viršuje centre
+  const myPosition = { x: 30, y: 10 };
 
-  const typeColor: Record<string, string> = {
-    action: "#185FA5",
-    trap: "#6B21A8",
-    response: "#1D4ED8",
-    curse: "#991B1B",
-  };
-  const typeBg: Record<string, string> = {
-    action: "#E6F1FB",
-    trap: "#F3E8FF",
-    response: "#DBEAFE",
-    curse: "#FEE2E2",
-  };
+  // Kiti žaidėjai — aplink stalą
+  function getOtherSeatPos(index: number, total: number) {
+    if (total === 0) return { x: 50, y: 50 };
+    const startAngle = 195;
+    const endAngle = 345;
+    const angle =
+      total === 1
+        ? 270
+        : startAngle + (index / (total - 1)) * (endAngle - startAngle);
+    const rad = angle * (Math.PI / 180);
+    const rx = 48,
+      ry = 46;
+    return { x: 50 + rx * Math.cos(rad), y: 50 + ry * Math.sin(rad) };
+  }
 
   function trapsByOwner(id: string | null) {
     return tableCards_.filter(
@@ -304,22 +304,14 @@ const GameBoard: React.FC = () => {
     );
   }
 
-  // Žaidėjų pozicijos aplink stalą (visi žaidėjai — 1 punktas)
-  function getSeatStyle(index: number, total: number): React.CSSProperties {
-    // Aš visada apačioje (ne ant pokerio stalo — žemiau)
-    // Kiti — aplink stalą viršuje
-    const angle = total <= 1 ? 270 : 180 + (index / (total - 1)) * 180;
-    const rad = angle * (Math.PI / 180);
-    const rx = 43,
-      ry = 40;
-    const cx = 50 + rx * Math.cos(rad);
-    const cy = 50 + ry * Math.sin(rad);
-    return {
-      left: `${cx}%`,
-      top: `${cy}%`,
-      transform: "translate(-50%, -50%)",
-    };
-  }
+  const myTraps = trapsByOwner(mySocketId);
+
+  const typeColor: Record<string, string> = {
+    action: "#185FA5",
+    trap: "#6B21A8",
+    response: "#1D4ED8",
+    curse: "#991B1B",
+  };
 
   function handleCardMenuPlay(card: CardType) {
     setMenuCard(null);
@@ -331,16 +323,17 @@ const GameBoard: React.FC = () => {
       playCard(card.instanceId);
       return;
     }
-    if (card.requiresTarget) {
-      setSelectingTarget(card);
-    } else {
-      playCard(card.instanceId);
-    }
+    if (card.requiresTarget) setSelectingTarget(card);
+    else playCard(card.instanceId);
   }
 
   function handleSelectOpponent(oppId: string) {
     if (trapActivating) {
-      activateTrap(trapActivating.id, oppId);
+      if (reactionWindow) {
+        activateTrapReaction(trapActivating.id, oppId);
+      } else {
+        activateTrap(trapActivating.id, oppId);
+      }
       setTrapActivating(null);
       return;
     }
@@ -349,30 +342,11 @@ const GameBoard: React.FC = () => {
       setSelectingTarget(null);
       return;
     }
-    if (actionNeedsTarget) {
-      selectTarget(oppId);
-    }
-  }
-
-  function handleTrapClick(tc: TableCard) {
-    setTrapMenuTc(tc);
-  }
-
-  function handleTrapInspect(tc: TableCard) {
-    setTrapMenuTc(null);
-    setTrapZoom(tc);
-  }
-
-  function handleTrapActivate(tc: TableCard) {
-    setTrapMenuTc(null);
-    if (!isMyTurn || actionUsed) return;
-    if (tc.card.requiresTarget) setTrapActivating(tc);
-    else activateTrap(tc.id);
+    if (actionNeedsTarget) selectTarget(oppId);
   }
 
   const needsTarget = selectingTarget || actionNeedsTarget || trapActivating;
 
-  // ── WINNER SCREEN ──────────────────────────────────────────────────────────
   if (winner) {
     return (
       <div className="winner-screen">
@@ -454,15 +428,23 @@ const GameBoard: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* TRAP MENIU — peržiūrėti / aktyvuoti (2 punktas) */}
+      {/* TRAP MENIU */}
       <AnimatePresence>
         {trapMenuTc && (
           <TrapMenu
             tc={trapMenuTc}
             isMyTurn={isMyTurn}
             actionUsed={actionUsed}
-            onInspect={() => handleTrapInspect(trapMenuTc)}
-            onActivate={() => handleTrapActivate(trapMenuTc)}
+            onInspect={() => {
+              setTrapZoom(trapMenuTc);
+              setTrapMenuTc(null);
+            }}
+            onActivate={() => {
+              const tc = trapMenuTc;
+              setTrapMenuTc(null);
+              if (tc.card.requiresTarget) setTrapActivating(tc);
+              else activateTrap(tc.id);
+            }}
             onClose={() => setTrapMenuTc(null)}
           />
         )}
@@ -524,7 +506,7 @@ const GameBoard: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* TAIKINIO PASIRINKIMAS */}
+      {/* TAIKINYS */}
       <AnimatePresence>
         {needsTarget && (
           <motion.div
@@ -626,13 +608,11 @@ const GameBoard: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* DISCARD MODALAS (3 punktas) */}
+      {/* DISCARD MODALAS */}
       <AnimatePresence>
         {showDiscardModal && (
           <DiscardModal
             discardPile={discardPile_}
-            opponents={opponents_}
-            mySocketId={mySocketId}
             onClose={() => setShowDiscardModal(false)}
           />
         )}
@@ -643,41 +623,84 @@ const GameBoard: React.FC = () => {
         {isMyTurn
           ? actionUsed
             ? "✅ Veiksmas atliktas..."
-            : "🐭 Tavo ėjimas! Pasirink veiksmą."
+            : "🐭 Tavo ėjimas!"
           : "Laukiame..."}
       </div>
 
-      {/* POKERIO STALAS — visi žaidėjai (1 punktas) */}
-      <div className="poker-table-wrap">
-        <div className="poker-table">
-          {/* CENTRAS */}
-          <div className="table-center">
-            {/* Discard pile — paspaudžiamas (3 punktas) */}
-            <div className="pile-wrap">
-              <span className="pile-lbl">Išmesta ({discardPile_.length})</span>
-              <div
-                className="discard-stack clickable"
-                onClick={() => setShowDiscardModal(true)}
-              >
-                {discardPile_.slice(-4).map((card, i) => (
-                  <div
-                    key={`${card.instanceId}-${i}`}
-                    className="discard-mini"
-                    style={{
-                      background: typeBg[card.type] || "#eee",
-                      borderColor: typeColor[card.type] || "#999",
-                      transform: `rotate(${(i - 1.5) * 7}deg) translateY(${i * -2}px)`,
-                      zIndex: i,
-                    }}
-                  />
-                ))}
-                {discardPile_.length === 0 && (
-                  <span className="pile-empty">–</span>
-                )}
+      {/* REACTION WINDOW */}
+      <AnimatePresence>
+        {reactionWindow && (
+          <motion.div
+            className="reaction-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="reaction-box">
+              <div className="reaction-title">⚡ Reakcijos laikas!</div>
+              <div className="reaction-info">
+                <span className="reaction-card">
+                  {reactionWindow.card?.title || "Veiksmas"}
+                </span>
+                <span className="reaction-timer">{reactionTimeLeft}s</span>
+              </div>
+              <div className="reaction-progress">
+                <motion.div
+                  className="reaction-progress-bar"
+                  initial={{ width: "100%" }}
+                  animate={{ width: "0%" }}
+                  transition={{
+                    duration: reactionWindow.durationMs / 1000,
+                    ease: "linear",
+                  }}
+                />
+              </div>
+              <div className="reaction-actions">
+                {/* Mano trap kortos kurias galiu aktyvuoti */}
+                {myTraps
+                  .filter((tc) => tc.canActivate || tc.card.trigger)
+                  .map((tc) => (
+                    <button
+                      key={tc.id}
+                      className="reaction-btn reaction-btn--trap"
+                      onClick={() => {
+                        if (tc.card.requiresTarget) setTrapActivating(tc);
+                        else activateTrapReaction(tc.id);
+                      }}
+                    >
+                      🪤 Aktyvuoti: {tc.card.title}
+                    </button>
+                  ))}
+                {/* Response kortos */}
+                {myCards_
+                  .filter((c) => c.isLightning && c.type === "response")
+                  .map((c) => (
+                    <button
+                      key={c.instanceId}
+                      className="reaction-btn reaction-btn--response"
+                      onClick={() => playCard(c.instanceId)}
+                    >
+                      🛡 {c.title}
+                    </button>
+                  ))}
+                <button
+                  className="reaction-btn reaction-btn--pass"
+                  onClick={passReaction}
+                >
+                  ⏭ Praleisti
+                </button>
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            {/* Kaladė */}
+      {/* POKERIO STALAS — VISI žaidėjai (5 punktas) */}
+      <div className="poker-table-wrap">
+        <div className="poker-table">
+          {/* CENTRAS — discard (1 punktas: po kalade) ir kaladė */}
+          <div className="table-center">
+            {/* Kaladė — pirma */}
             <div className="pile-wrap">
               <span className="pile-lbl">Kaladė ({deckCount})</span>
               <div
@@ -697,19 +720,94 @@ const GameBoard: React.FC = () => {
                 )}
               </div>
             </div>
+
+            {/* Discard — po kalade (1 punktas) */}
+            <div className="pile-wrap">
+              <span className="pile-lbl">Išmesta ({discardPile_.length})</span>
+              <div
+                className="discard-stack clickable"
+                onClick={() => setShowDiscardModal(true)}
+              >
+                {discardPile_.slice(-4).map((card, i) => (
+                  <div
+                    key={`${card.instanceId}-${i}`}
+                    className="discard-mini"
+                    style={{
+                      background:
+                        card.type === "action"
+                          ? "#E6F1FB"
+                          : card.type === "trap"
+                            ? "#F3E8FF"
+                            : card.type === "response"
+                              ? "#DBEAFE"
+                              : "#FEE2E2",
+                      borderColor: typeColor[card.type] || "#999",
+                      transform: `rotate(${(i - 1.5) * 7}deg) translateY(${i * -2}px)`,
+                      zIndex: i,
+                    }}
+                  />
+                ))}
+                {discardPile_.length === 0 && (
+                  <span className="pile-empty">–</span>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* VISI OPONENTAI aplink stalą (1 punktas) */}
+          {/* MANO IKONAS — viršuje centre (5 punktas) */}
+          <div
+            className="player-seat player-seat--me"
+            style={{
+              left: `${myPosition.x}%`,
+              top: `${myPosition.y}%`,
+              transform: "translate(-50%, -50%)",
+            }}
+          >
+            {myTraps.length > 0 && (
+              <div className="seat-traps">
+                {myTraps.map((tc, ti) => (
+                  <div
+                    key={tc.id}
+                    className="trap-face-down"
+                    style={{ transform: `rotate(${(ti - 1) * 12}deg)` }}
+                    title={tc.card.title}
+                    onClick={() => setTrapMenuTc(tc)}
+                  />
+                ))}
+              </div>
+            )}
+            <div
+              className={`player-icon player-icon--me ${isMyTurn ? "player-icon--active" : ""}`}
+            >
+              <PawnIcon size={20} />
+            </div>
+            {iMadMousePending && (
+              <motion.div
+                className="mad-mouse-pending-badge"
+                animate={{ opacity: [1, 0.3, 1] }}
+                transition={{ repeat: Infinity, duration: 0.8 }}
+              >
+                🐭 MAD MOUSE!
+              </motion.div>
+            )}
+            <div className="seat-name seat-name--me">Tu</div>
+            <div className="seat-count">{myCards_.length}🃏</div>
+          </div>
+
+          {/* KITI ŽAIDĖJAI aplink stalą (5 punktas) */}
           {otherPlayers.map((opp, i) => {
+            const pos = getOtherSeatPos(i, otherPlayers.length);
             const isActive = currentTurnPlayerId === opp.id;
             const oppTraps = trapsByOwner(opp.id);
-            const pos = getSeatStyle(i, otherPlayers.length);
-
             return (
               <div
                 key={opp.id}
                 className={`player-seat ${isActive ? "player-seat--active" : ""} ${!opp.isConnected ? "player-seat--offline" : ""}`}
-                style={pos}
+                style={{
+                  left: `${pos.x}%`,
+                  top: `${pos.y}%`,
+                  transform: "translate(-50%, -50%)",
+                }}
               >
                 {oppTraps.length > 0 && (
                   <div className="seat-traps">
@@ -746,29 +844,45 @@ const GameBoard: React.FC = () => {
         </div>
       </div>
 
-      {/* MANO TRAP KORTOS — su meniu (2 punktas) */}
-      <AnimatePresence>
-        {myTraps.length > 0 && (
-          <motion.div
-            className="my-traps"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <span className="my-traps-lbl">🪤 Mano spąstai</span>
-            {myTraps.map((tc) => (
-              <div
-                key={tc.id}
-                className="my-trap-chip"
-                onClick={() => handleTrapClick(tc)}
-              >
-                <div className="trap-face-down trap-face-down--sm" />
-                <span className="my-trap-name">{tc.card.title}</span>
-                <span className="my-trap-hint">👆</span>
-              </div>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* STALO KORTOS — trap ir curse (2 punktas) */}
+      {tableCards_.length > 0 && (
+        <div className="table-cards-row">
+          <span className="table-cards-lbl">🃏 Ant stalo</span>
+          {tableCards_.map((tc) => (
+            <div
+              key={tc.id}
+              className={`table-card-chip table-card-chip--${tc.card.type} ${tc.ownerId === mySocketId ? "table-card-chip--mine" : ""}`}
+              onClick={() =>
+                tc.ownerId === mySocketId ? setTrapMenuTc(tc) : null
+              }
+              style={{
+                cursor: tc.ownerId === mySocketId ? "pointer" : "default",
+              }}
+            >
+              <div className="trap-face-down trap-face-down--sm" />
+              {/* Savininkas (4 punktas) */}
+              <span className="table-card-owner">👤 {tc.ownerName}</span>
+              {tc.ownerId === mySocketId && (
+                <span className="table-card-hint">👆</span>
+              )}
+              {tc.turnsLeft !== null && (
+                <span className="table-card-turns">⏱{tc.turnsLeft}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* MAD MOUSE BANNER */}
+      {iMadMousePending && (
+        <motion.div
+          className="my-mad-mouse-banner"
+          animate={{ opacity: [1, 0.5, 1] }}
+          transition={{ repeat: Infinity, duration: 0.9 }}
+        >
+          🐭 MAD MOUSE paskelbtas! Laukiame rato...
+        </motion.div>
+      )}
 
       {/* DEŠINĖ PANELĖ */}
       <div className="side-btns">
@@ -789,17 +903,6 @@ const GameBoard: React.FC = () => {
           </motion.button>
         )}
       </div>
-
-      {/* MAD MOUSE BANNER */}
-      {iMadMousePending && (
-        <motion.div
-          className="my-mad-mouse-banner"
-          animate={{ opacity: [1, 0.5, 1] }}
-          transition={{ repeat: Infinity, duration: 0.9 }}
-        >
-          🐭 MAD MOUSE paskelbtas! Laukiame rato pabaigos...
-        </motion.div>
-      )}
 
       {/* RANKA */}
       <div className="hand-area">

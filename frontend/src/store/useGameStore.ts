@@ -58,6 +58,13 @@ interface GameStore {
   phase: string;
   actionUsed: boolean;
   madMousePlayerId: string | null;
+  reactionWindow: {
+    initiatorId: string;
+    card: any;
+    targetId: string | null;
+    durationMs: number;
+    startedAt: number;
+  } | null;
 
   notification: { message: string; type: string } | null;
   inspectResult: { targetUsername: string; cards: CardType[] } | null;
@@ -85,6 +92,8 @@ interface GameStore {
   clearInspect: () => void;
   clearInspectSteal: () => void;
   clearActionNeedsTarget: () => void;
+  passReaction: () => void;
+  activateTrapReaction: (tableCardId: string, targetId?: string) => void;
 }
 
 function playSound(name: string) {
@@ -151,6 +160,14 @@ export const useGameStore = create<GameStore>((set, get) => {
     alert(msg);
   });
 
+  socket.on("reaction_window_start", (data: any) => {
+    set({ reactionWindow: { ...data, startedAt: Date.now() } });
+  });
+
+  socket.on("reaction_window_end", () => {
+    set({ reactionWindow: null });
+  });
+
   return {
     roomId: null,
     mySocketId: null,
@@ -167,6 +184,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     phase: "playing",
     actionUsed: false,
     madMousePlayerId: null,
+    reactionWindow: null,
     notification: null,
     inspectResult: null,
     inspectStealResult: null,
@@ -241,6 +259,20 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (roomId) socket.emit("restart_game", roomId);
     },
 
+    passReaction: () => {
+      const { roomId } = get();
+      if (roomId) socket.emit("pass_reaction", roomId);
+      set({ reactionWindow: null });
+    },
+    activateTrapReaction: (tableCardId, targetId) => {
+      const { roomId } = get();
+      if (roomId)
+        socket.emit("activate_trap_reaction", {
+          roomId,
+          tableCardId,
+          targetId,
+        });
+    },
     clearInspect: () => set({ inspectResult: null }),
     clearInspectSteal: () => set({ inspectStealResult: null }),
     clearActionNeedsTarget: () => set({ actionNeedsTarget: null }),
