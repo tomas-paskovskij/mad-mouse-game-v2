@@ -1,22 +1,185 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence, useDragControls } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useGameStore } from "../../store/useGameStore";
 import type { CardType, TableCard } from "../../store/useGameStore";
 import { socket } from "../../services/socket";
 import Card from "./Card";
 import "./GameBoard.css";
 
-const PawnIcon = ({ size = 24 }: { size?: number }) => (
-  <svg viewBox="0 0 45 45" width={size} height={size} fill="currentColor">
-    <path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 16.5 16 18.59 16 21c0 2.03.94 3.84 2.41 5.03L15 29H30l-3.41-2.97C28.06 24.84 29 23.03 29 21c0-2.41-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z" />
-    <rect x="12" y="30" width="21" height="2.5" rx="1" />
-    <rect x="10" y="33.5" width="25" height="3" rx="1" />
-  </svg>
+// ─── AVATAR ───────────────────────────────────────────────────────────────────
+const Avatar: React.FC<{
+  name: string;
+  size?: number;
+  active?: boolean;
+  isMe?: boolean;
+  cardCount?: number;
+}> = ({ name, size = 36, active, isMe, cardCount }) => {
+  const initials = name.slice(0, 2).toUpperCase();
+  const palette = [
+    "#4a7fd4",
+    "#c084fc",
+    "#f472b6",
+    "#fb923c",
+    "#34d399",
+    "#f87171",
+    "#60a5fa",
+  ];
+  const color = palette[name.charCodeAt(0) % palette.length];
+  return (
+    <div
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 2,
+      }}
+    >
+      <div
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          background: isMe ? "#1d3a6e" : "#1e1b2e",
+          border: `2px solid ${active ? "#4ade80" : isMe ? "#60a5fa" : "#2d2a45"}`,
+          boxShadow: active
+            ? "0 0 0 3px rgba(74,222,128,0.25)"
+            : isMe
+              ? "0 0 0 3px rgba(96,165,250,0.2)"
+              : "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: size * 0.34,
+          fontWeight: 800,
+          color,
+          flexShrink: 0,
+          transition: "all 0.2s",
+        }}
+      >
+        {initials}
+      </div>
+      {cardCount !== undefined && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: -4,
+            right: -4,
+            background: "#1d4ed8",
+            color: "white",
+            fontSize: "0.48rem",
+            fontWeight: 900,
+            minWidth: 16,
+            height: 16,
+            borderRadius: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            border: "1.5px solid #0d0d1a",
+            padding: "0 3px",
+          }}
+        >
+          {cardCount}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── CHAIN ENTRY TYPE ─────────────────────────────────────────────────────────
+interface ChainEntry {
+  id: number;
+  card: CardType;
+  playerName: string;
+  playerId: string;
+  isTrap?: boolean;
+}
+
+// ─── FULL SCREEN PLAY MODAL ───────────────────────────────────────────────────
+const PlayModal: React.FC<{
+  entry: ChainEntry;
+  chain: ChainEntry[];
+  onSkip: () => void;
+}> = ({ entry, chain, onSkip }) => (
+  <motion.div
+    className="play-modal"
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+  >
+    <div className="play-modal-backdrop" />
+    <div className="play-modal-inner">
+      <div className="play-modal-who">
+        <Avatar name={entry.playerName} size={28} />
+        <span className="play-modal-who-name">{entry.playerName} played</span>
+      </div>
+      <motion.div
+        initial={{ scale: 0.2, y: -120, rotate: -18, opacity: 0 }}
+        animate={{ scale: 1, y: 0, rotate: 0, opacity: 1 }}
+        exit={{ scale: 0.4, y: 80, opacity: 0 }}
+        transition={{ type: "spring", damping: 13, stiffness: 160 }}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        {entry.isTrap ? (
+          <div className="play-modal-facedown">
+            <span className="play-modal-facedown-q">?</span>
+            <span className="play-modal-facedown-lbl">🪤 TRAP</span>
+          </div>
+        ) : (
+          <div className="play-modal-card-wrap">
+            <Card {...entry.card} instanceId={`modal-${entry.id}`} />
+          </div>
+        )}
+        {!entry.isTrap && (
+          <p className="play-modal-desc">{entry.card.description}</p>
+        )}
+      </motion.div>
+      <div className="play-modal-timer-bar-wrap">
+        <motion.div
+          className="play-modal-timer-bar"
+          initial={{ width: "100%" }}
+          animate={{ width: "0%" }}
+          transition={{ duration: 4.5, ease: "linear" }}
+        />
+      </div>
+      {/* Mini chain preview */}
+      {chain.length > 1 && (
+        <div className="play-modal-chain-preview">
+          <div className="section-label">CURRENT CHAIN WILL UPDATE</div>
+          <div className="chain-row">
+            {chain.map((e, i) => (
+              <React.Fragment key={e.id}>
+                <div
+                  className={`chain-slot ${e.id === entry.id ? "chain-slot--active" : ""}`}
+                >
+                  <span className="chain-num">{i + 1}</span>
+                  {e.isTrap ? (
+                    <div className="chain-facedown">?</div>
+                  ) : (
+                    <Card {...e.card} instanceId={`pm-${e.id}`} compact />
+                  )}
+                </div>
+                {i < chain.length - 1 && <span className="chain-arrow">→</span>}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+    <button className="skip-btn" onClick={onSkip}>
+      Praleisti ▶
+    </button>
+  </motion.div>
 );
 
-// ─── CARD ACTION MENU ─────────────────────────────────────────────────────────
-const CardActionMenu: React.FC<{
+// ─── CARD MENU ────────────────────────────────────────────────────────────────
+const CardMenu: React.FC<{
   card: CardType;
   isMyTurn: boolean;
   actionUsed: boolean;
@@ -24,6 +187,7 @@ const CardActionMenu: React.FC<{
   turnNumber: number;
   mulliganUsed: boolean;
   onPlay: () => void;
+  onPlaceTrap: () => void;
   onDiscard: () => void;
   onInspect: () => void;
   onMulligan: () => void;
@@ -36,19 +200,21 @@ const CardActionMenu: React.FC<{
   turnNumber,
   mulliganUsed,
   onPlay,
+  onPlaceTrap,
   onDiscard,
   onInspect,
   onMulligan,
   onClose,
 }) => {
+  const isTrap = card.type === "trap";
   const canPlay =
     (isMyTurn && !actionUsed) ||
     (card.isLightning &&
-      card.type === "response" &&
-      (card.effect === "shield" || pendingAction !== null));
+      (card.type === "interrupt" || card.type === "response") &&
+      (card.effect === "shield" || !!pendingAction));
   return (
     <motion.div
-      className="card-menu-overlay"
+      className="overlay"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -57,34 +223,42 @@ const CardActionMenu: React.FC<{
       <motion.div
         className="card-menu"
         initial={{ scale: 0.85, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
+        animate={{ scale: 2, y: 0 }}
         exit={{ scale: 0.85 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="card-menu-preview">
+        <div>
           <Card {...card} />
         </div>
-        <div className="card-menu-actions">
-          <button className="cmb cmb--inspect" onClick={onInspect}>
+        <div className="menu-actions">
+          <button className="menu-btn menu-btn--inspect" onClick={onInspect}>
             🔍 Peržiūrėti
           </button>
-          {canPlay && (
-            <button className="cmb cmb--play" onClick={onPlay}>
+          {canPlay && !isTrap && (
+            <button className="menu-btn menu-btn--play" onClick={onPlay}>
               ▶ Panaudoti
             </button>
           )}
+          {canPlay && isTrap && (
+            <button className="menu-btn menu-btn--trap" onClick={onPlaceTrap}>
+              🪤 Padėti ant stalo
+            </button>
+          )}
           {turnNumber === 0 && !mulliganUsed && (
-            <button className="cmb cmb--mulligan" onClick={onMulligan}>
+            <button
+              className="menu-btn menu-btn--mulligan"
+              onClick={onMulligan}
+            >
               🔀 Mulligan
             </button>
           )}
           {isMyTurn && !actionUsed && (
-            <button className="cmb cmb--discard" onClick={onDiscard}>
+            <button className="menu-btn menu-btn--discard" onClick={onDiscard}>
               🗑 Išmesti
             </button>
           )}
         </div>
-        <button className="card-menu-close" onClick={onClose}>
+        <button className="overlay-close" onClick={onClose}>
           ✕
         </button>
       </motion.div>
@@ -114,7 +288,7 @@ const TrapMenu: React.FC<{
     tc.canActivate && isMyTurn && !actionUsed && tc.placedAtTurn !== turnNumber;
   return (
     <motion.div
-      className="card-menu-overlay"
+      className="overlay"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -127,22 +301,24 @@ const TrapMenu: React.FC<{
         exit={{ scale: 0.85 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="trap-menu-title">🪤 Mano spąstas</div>
-        <div className="trap-menu-name">{tc.card.title}</div>
-        <div className="card-menu-actions">
-          <button className="cmb cmb--inspect" onClick={onInspect}>
+        <div className="trap-menu-header">
+          <span className="trap-menu-badge">🪤 TRAP</span>
+          <span className="trap-menu-title">{tc.card.title}</span>
+        </div>
+        <div className="menu-actions">
+          <button className="menu-btn menu-btn--inspect" onClick={onInspect}>
             🔍 Peržiūrėti efektą
           </button>
           {canActivate && (
-            <button className="cmb cmb--play" onClick={onActivate}>
+            <button className="menu-btn menu-btn--play" onClick={onActivate}>
               ⚡ Aktyvuoti
             </button>
           )}
           {tc.placedAtTurn === turnNumber && (
-            <p className="trap-cooldown">⏳ Galima aktyvuoti kitą ėjimą</p>
+            <p className="cooldown-note">⏳ Galima aktyvuoti kitą ėjimą</p>
           )}
         </div>
-        <button className="card-menu-close" onClick={onClose}>
+        <button className="overlay-close" onClick={onClose}>
           ✕
         </button>
       </motion.div>
@@ -151,15 +327,17 @@ const TrapMenu: React.FC<{
 };
 
 // ─── DISCARD MODAL ────────────────────────────────────────────────────────────
-const DiscardModal: React.FC<{ discardPile: any[]; onClose: () => void }> = ({
-  discardPile,
+const DiscardModal: React.FC<{ pile: any[]; onClose: () => void }> = ({
+  pile,
   onClose,
 }) => {
-  const typeColor: Record<string, string> = {
-    action: "#60a5fa",
+  const colors: Record<string, string> = {
+    action: "#4a7fd4",
     trap: "#a78bfa",
+    interrupt: "#34d399",
     response: "#34d399",
     curse: "#f87171",
+    goal: "#fbbf24",
   };
   return (
     <motion.div
@@ -175,25 +353,31 @@ const DiscardModal: React.FC<{ discardPile: any[]; onClose: () => void }> = ({
         animate={{ scale: 1 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3>🗑 Išmestos kortos ({discardPile.length})</h3>
-        <div className="discard-modal-list">
-          {discardPile.length === 0 && <p className="empty-msg">Nėra</p>}
-          {[...discardPile].reverse().map((card, i) => (
-            <div
-              key={`${card.instanceId}-${i}`}
-              className="discard-row"
-              style={{ borderColor: typeColor[card.type] || "#555" }}
-            >
-              <span className="discard-num">#{discardPile.length - i}</span>
-              <span className="discard-title">{card.title}</span>
-              <span className="discard-owner">
-                👤 {card.ownerUsername || "?"}
-              </span>
+        <div className="modal-header">
+          <h3>Discard Pile History</h3>
+          <button
+            className="overlay-close overlay-close--inline"
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        </div>
+        <div className="discard-list">
+          {pile.length === 0 && (
+            <p className="empty-note">Dar nėra išmestų kortų</p>
+          )}
+          {[...pile].reverse().map((card, i) => (
+            <div key={`${card.instanceId}-${i}`} className="discard-row">
+              <span className="discard-idx">{pile.length - i}</span>
+              <span className="discard-time">{card.time || "--:--"}</span>
+              <Avatar name={card.ownerUsername || "?"} size={20} />
+              <span className="discard-who">{card.ownerUsername || "?"}</span>
+              <span className="discard-verb">played</span>
               <span
-                className="discard-type"
-                style={{ color: typeColor[card.type] }}
+                className="discard-card-name"
+                style={{ color: colors[card.type] || "white" }}
               >
-                {card.type}
+                {card.title}
               </span>
             </div>
           ))}
@@ -206,11 +390,92 @@ const DiscardModal: React.FC<{ discardPile: any[]; onClose: () => void }> = ({
   );
 };
 
+// ─── REACTION WINDOW ──────────────────────────────────────────────────────────
+const ReactionWindow: React.FC<{
+  rw: any;
+  secs: number;
+  myTraps: TableCard[];
+  myCards: CardType[];
+  turnNumber: number;
+  onPass: () => void;
+  onPlayCard: (id: string) => void;
+  onTrapReaction: (id: string, targetId?: string) => void;
+  onSetTrapActivating: (tc: TableCard) => void;
+}> = ({
+  rw,
+  secs,
+  myTraps,
+  myCards,
+  turnNumber,
+  onPass,
+  onPlayCard,
+  onTrapReaction,
+  onSetTrapActivating,
+}) => (
+  <motion.div
+    className="reaction-panel"
+    initial={{ y: 20, opacity: 0 }}
+    animate={{ y: 0, opacity: 1 }}
+    exit={{ y: 20, opacity: 0 }}
+  >
+    <div className="reaction-header">
+      <span className="reaction-title">⚡ Reakcijos laikas!</span>
+      <span
+        className={`reaction-secs ${secs <= 2 ? "reaction-secs--urgent" : ""}`}
+      >
+        {secs}s
+      </span>
+    </div>
+    <div className="reaction-card-name">{rw.card?.title || "Veiksmas"}</div>
+    <div className="reaction-progress-track">
+      <motion.div
+        className="reaction-progress-fill"
+        initial={{ width: "100%" }}
+        animate={{ width: "0%" }}
+        transition={{ duration: rw.durationMs / 1000, ease: "linear" }}
+      />
+    </div>
+    <div className="reaction-btns">
+      {myTraps
+        .filter((tc) => tc.placedAtTurn !== turnNumber)
+        .map((tc) => (
+          <button
+            key={tc.id}
+            className="rbtn rbtn--trap"
+            onClick={() =>
+              tc.card.requiresTarget
+                ? onSetTrapActivating(tc)
+                : onTrapReaction(tc.id)
+            }
+          >
+            🪤 {tc.card.title}
+          </button>
+        ))}
+      {myCards
+        .filter(
+          (c) =>
+            c.isLightning && (c.type === "interrupt" || c.type === "response"),
+        )
+        .map((c) => (
+          <button
+            key={c.instanceId}
+            className="rbtn rbtn--interrupt"
+            onClick={() => onPlayCard(c.instanceId)}
+          >
+            🛡 {c.title}
+          </button>
+        ))}
+      <button className="rbtn rbtn--pass" onClick={onPass}>
+        ⏭ Praleisti
+      </button>
+    </div>
+  </motion.div>
+);
+
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 const GameBoard: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-
   const {
     myCards,
     opponents,
@@ -229,8 +494,6 @@ const GameBoard: React.FC = () => {
     actionUsed,
     madMousePlayerId,
     reactionWindow,
-    playedCard,
-    turnChain,
     mySocketId,
     initGame,
     playCard,
@@ -238,7 +501,6 @@ const GameBoard: React.FC = () => {
     activateTrap,
     inspectStealPick,
     drawCard,
-    endTurn,
     declareMadMouse,
     mulligan,
     restartGame,
@@ -247,31 +509,99 @@ const GameBoard: React.FC = () => {
     clearInspect,
     clearInspectSteal,
     clearActionNeedsTarget,
-    clearPlayedCard,
   } = useGameStore();
 
   const [menuCard, setMenuCard] = useState<CardType | null>(null);
   const [zoomCard, setZoomCard] = useState<CardType | null>(null);
-  const [selectingTarget, setSelectingTarget] = useState<CardType | null>(null);
-  const [trapActivating, setTrapActivating] = useState<TableCard | null>(null);
-  const [mulliganUsed, setMulliganUsed] = useState(false);
-  const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [trapMenuTc, setTrapMenuTc] = useState<TableCard | null>(null);
   const [trapZoom, setTrapZoom] = useState<TableCard | null>(null);
+  const [selectingTarget, setSelectTarget] = useState<CardType | null>(null);
+  const [trapActivating, setTrapActivating] = useState<TableCard | null>(null);
+  const [mulliganUsed, setMulliganUsed] = useState(false);
+  const [showDiscard, setShowDiscard] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<
     { id: number; msg: string; type: string; time: string }[]
   >([]);
-  const [showHistory, setShowHistory] = useState(false);
-  const [flashEmoji, setFlashEmoji] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
   const [reactionSecs, setReactionSecs] = useState(0);
-  const historyRef = useRef<HTMLDivElement>(null);
-  const reactionInterval = useRef<any>(null);
+  const [chain, setChain] = useState<ChainEntry[]>([]);
+  const [stageActive, setStageActive] = useState(false);
+  const [stageIdx, setStageIdx] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const histRef = useRef<HTMLDivElement>(null);
+  const reactionIv = useRef<any>(null);
+  const stageTimer = useRef<any>(null);
+  const elapsedIv = useRef<any>(null);
 
   useEffect(() => {
     if (roomId) initGame(roomId);
   }, [roomId]);
 
-  // Historia
+  // elapsed timer (00:XX)
+  useEffect(() => {
+    elapsedIv.current = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(elapsedIv.current);
+  }, []);
+
+  // chain socket events
+  useEffect(() => {
+    const onPlayed = (data: {
+      card: CardType;
+      playerName: string;
+      playerId: string;
+      isTrap?: boolean;
+    }) => {
+      const entry: ChainEntry = { id: Date.now(), ...data };
+      setChain((prev) => {
+        const next = [...prev, entry];
+        if (!stageActive) {
+          setStageActive(true);
+          setStageIdx(next.length - 1);
+          scheduleNext(next, next.length - 1);
+        }
+        return next;
+      });
+    };
+    const onClear = () => {
+      clearTimeout(stageTimer.current);
+      setChain([]);
+      setStageActive(false);
+      setStageIdx(0);
+    };
+    socket.on("card_played_display", onPlayed);
+    socket.on("turn_chain_clear", onClear);
+    return () => {
+      socket.off("card_played_display", onPlayed);
+      socket.off("turn_chain_clear", onClear);
+    };
+  }, [stageActive]);
+
+  function scheduleNext(ch: ChainEntry[], idx: number) {
+    clearTimeout(stageTimer.current);
+    stageTimer.current = setTimeout(() => {
+      setChain((prev) => {
+        if (idx + 1 < prev.length) {
+          setStageIdx(idx + 1);
+          scheduleNext(prev, idx + 1);
+        } else setStageActive(false);
+        return prev;
+      });
+    }, 5000);
+  }
+  function stageDone() {
+    clearTimeout(stageTimer.current);
+    setChain((prev) => {
+      if (stageIdx + 1 < prev.length) {
+        const n = stageIdx + 1;
+        setStageIdx(n);
+        scheduleNext(prev, n);
+      } else setStageActive(false);
+      return prev;
+    });
+  }
+
+  // notifications → history + flash
   useEffect(() => {
     if (!notification) return;
     const time = new Date().toLocaleTimeString("lt-LT", {
@@ -279,8 +609,8 @@ const GameBoard: React.FC = () => {
       minute: "2-digit",
       second: "2-digit",
     });
-    setHistory((prev) => [
-      ...prev.slice(-49),
+    setHistory((p) => [
+      ...p.slice(-49),
       {
         id: Date.now(),
         msg: notification.message,
@@ -288,117 +618,99 @@ const GameBoard: React.FC = () => {
         time,
       },
     ]);
-    const emojis: Record<string, string> = {
+    const em: Record<string, string> = {
       action: "⚡",
       trap: "🪤",
+      interrupt: "🛡",
       response: "🛡",
       curse: "💀",
       turn: "▶",
       skip: "⏭",
       mad_mouse: "🐭",
-      shield: "🛡",
     };
-    setFlashEmoji(emojis[notification.type] || "⚡");
-    setTimeout(() => setFlashEmoji(null), 900);
+    setFlash(em[notification.type] || "⚡");
+    setTimeout(() => setFlash(null), 900);
   }, [notification]);
-
   useEffect(() => {
-    if (historyRef.current)
-      historyRef.current.scrollTop = historyRef.current.scrollHeight;
+    if (histRef.current)
+      histRef.current.scrollTop = histRef.current.scrollHeight;
   }, [history]);
 
-  // Reaction timer
+  // reaction timer countdown
   useEffect(() => {
     if (reactionWindow) {
       setReactionSecs(Math.round(reactionWindow.durationMs / 1000));
-      reactionInterval.current = setInterval(() => {
-        setReactionSecs((s) => {
-          if (s <= 1) {
-            clearInterval(reactionInterval.current);
-            return 0;
-          }
-          return s - 1;
-        });
-      }, 1000);
+      reactionIv.current = setInterval(
+        () =>
+          setReactionSecs((s) => {
+            if (s <= 1) {
+              clearInterval(reactionIv.current);
+              return 0;
+            }
+            return s - 1;
+          }),
+        1000,
+      );
     } else {
-      clearInterval(reactionInterval.current);
+      clearInterval(reactionIv.current);
       setReactionSecs(0);
     }
-    return () => clearInterval(reactionInterval.current);
+    return () => clearInterval(reactionIv.current);
   }, [reactionWindow?.startedAt]);
 
   const myCards_ = myCards || [];
   const opponents_ = opponents || [];
   const tableCards_ = tableCards || [];
   const discardPile_ = discardPile || [];
-
   const isMyTurn = currentTurnPlayerId === mySocketId;
-  const iMadMousePending = madMousePlayerId === mySocketId;
-  const canDeclareWin =
-    myCards_.length >= (handLimit || 10) && !madMousePlayerId;
-  const visualLayers = Math.min(Math.floor(deckCount / 4), 12);
+  const iMadMouse = madMousePlayerId === mySocketId;
+  const canDeclare = myCards_.length >= (handLimit || 10) && !madMousePlayerId;
+  const vLayers = Math.min(Math.floor(deckCount / 4), 12);
   const otherPlayers = opponents_.filter((o) => o.id !== socket.id);
   const myTraps = tableCards_.filter(
     (tc) => tc.ownerId === mySocketId && tc.card.type === "trap",
   );
+  const trapCards_ = tableCards_.filter((tc) => tc.card.type === "trap");
+  // ordered players: others first, then me
+  const allOrdered = [
+    ...otherPlayers,
+    opponents_.find((o) => o.id === mySocketId),
+  ].filter(Boolean) as any[];
 
-  const typeColor: Record<string, string> = {
-    action: "#60a5fa",
-    trap: "#a78bfa",
-    response: "#34d399",
-    curse: "#f87171",
-  };
+  const fmt = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  function trapsByOwner(id: string | null) {
-    return tableCards_.filter(
-      (tc) => tc.ownerId === id && tc.card.type === "trap",
-    );
-  }
-
-  // Žaidėjų pozicijos
-  const myPos = { x: 50, y: 110 };
-  function getOtherPos(i: number, total: number) {
-    if (total === 0) return { x: 50, y: 88 };
-    const start = 200,
-      end = 340;
-    const angle = total === 1 ? 270 : start + (i / (total - 1)) * (end - start);
-    const rad = (angle * Math.PI) / 180;
-    return { x: 50 + 46 * Math.cos(rad), y: 50 + 44 * Math.sin(rad) };
-  }
-
-  function handleCardMenuPlay(card: CardType) {
+  function playMenuCard(card: CardType) {
     setMenuCard(null);
-    if (card.isLightning && card.type === "response") {
+    if (
+      (card.type === "interrupt" || card.type === "response") &&
+      card.isLightning
+    ) {
       playCard(card.instanceId);
       return;
     }
-    if (card.type === "trap") {
-      playCard(card.instanceId);
-      return;
-    }
-    if (card.requiresTarget) setSelectingTarget(card);
+    if (card.requiresTarget) setSelectTarget(card);
     else playCard(card.instanceId);
   }
-
-  function handleSelectOpponent(oppId: string) {
+  function handleSelectOpp(id: string) {
     if (trapActivating) {
-      if (reactionWindow) activateTrapReaction(trapActivating.id, oppId);
-      else activateTrap(trapActivating.id, oppId);
+      reactionWindow
+        ? activateTrapReaction(trapActivating.id, id)
+        : activateTrap(trapActivating.id, id);
       setTrapActivating(null);
       return;
     }
     if (selectingTarget) {
-      playCard(selectingTarget.instanceId, oppId);
-      setSelectingTarget(null);
+      playCard(selectingTarget.instanceId, id);
+      setSelectTarget(null);
       return;
     }
-    if (actionNeedsTarget) selectTarget(oppId);
+    if (actionNeedsTarget) selectTarget(id);
   }
-
   const needsTarget = selectingTarget || actionNeedsTarget || trapActivating;
 
   // ── WINNER ────────────────────────────────────────────────────────────────
-  if (winner) {
+  if (winner)
     return (
       <div className="winner-screen">
         <motion.div
@@ -407,23 +719,20 @@ const GameBoard: React.FC = () => {
           animate={{ scale: 1, opacity: 1 }}
         >
           <motion.div
-            className="winner-emoji"
+            className="winner-mouse"
             animate={{ rotate: [0, -10, 10, -10, 0] }}
             transition={{ repeat: Infinity, duration: 2 }}
           >
             🐭
           </motion.div>
           <h2>MAD MOUSE!</h2>
-          <p className="winner-name">{winner} laimi!</p>
-          <div className="winner-actions">
-            <button
-              className="winner-btn winner-btn--restart"
-              onClick={restartGame}
-            >
+          <p>{winner} laimi!</p>
+          <div className="winner-btns">
+            <button className="wbtn wbtn--restart" onClick={restartGame}>
               🔄 Iš naujo
             </button>
             <button
-              className="winner-btn winner-btn--lobby"
+              className="wbtn wbtn--lobby"
               onClick={() => navigate("/lobby")}
             >
               🏠 Lobby
@@ -432,16 +741,20 @@ const GameBoard: React.FC = () => {
         </motion.div>
       </div>
     );
-  }
 
   return (
-    // 4 punktas — background keičiasi kai tavo ėjimas
-    <div className={`game-board ${isMyTurn ? "game-board--my-turn" : ""}`}>
-      {/* PRANEŠIMAI */}
+    <div className={`board rounded-[20px] ${isMyTurn ? "board--my-turn" : ""}`}>
+      {/* PLAY MODAL */}
+      <AnimatePresence>
+        {stageActive && chain[stageIdx] && (
+          <PlayModal entry={chain[stageIdx]} chain={chain} onSkip={stageDone} />
+        )}
+      </AnimatePresence>
+      {/* NOTIFICATION */}
       <AnimatePresence>
         {notification && (
           <motion.div
-            className={`notification notification--${notification.type}`}
+            className={`notif notif--${notification.type}`}
             initial={{ opacity: 0, y: -20, x: "-50%" }}
             animate={{ opacity: 1, y: 0, x: "-50%" }}
             exit={{ opacity: 0, y: -20, x: "-50%" }}
@@ -450,53 +763,21 @@ const GameBoard: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* PADĖTA KORTA — rodoma ekrano viduryje */}
-      <AnimatePresence>
-        {playedCard && (
-          <motion.div
-            className="played-card-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={clearPlayedCard}
-          >
-            <motion.div
-              className="played-card-container"
-              initial={{ scale: 0.3, y: -80, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{
-                scale: 0.5,
-                y: 60,
-                opacity: 0,
-                transition: { duration: 0.4 },
-              }}
-              transition={{ type: "spring", damping: 15, stiffness: 200 }}
-            >
-              <div className="played-card-player">
-                <PawnIcon size={14} />
-                <span>{playedCard.playerName}</span>
-              </div>
-              <Card
-                {...playedCard.card}
-                instanceId={`played-${playedCard.card.id}`}
-              />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* KORTOS MENIU */}
+      {/* CARD MENU */}
       <AnimatePresence>
         {menuCard && (
-          <CardActionMenu
+          <CardMenu
             card={menuCard}
             isMyTurn={isMyTurn}
             actionUsed={actionUsed}
             pendingAction={pendingAction}
             turnNumber={turnNumber}
             mulliganUsed={mulliganUsed}
-            onPlay={() => handleCardMenuPlay(menuCard)}
+            onPlay={() => playMenuCard(menuCard)}
+            onPlaceTrap={() => {
+              setMenuCard(null);
+              playCard(menuCard.instanceId);
+            }}
             onDiscard={() => {
               playCard(menuCard.instanceId, undefined, { discard: true });
               setMenuCard(null);
@@ -514,8 +795,7 @@ const GameBoard: React.FC = () => {
           />
         )}
       </AnimatePresence>
-
-      {/* TRAP MENIU */}
+      {/* TRAP MENU */}
       <AnimatePresence>
         {trapMenuTc && (
           <TrapMenu
@@ -530,19 +810,19 @@ const GameBoard: React.FC = () => {
             onActivate={() => {
               const tc = trapMenuTc;
               setTrapMenuTc(null);
-              if (tc.card.requiresTarget) setTrapActivating(tc);
-              else activateTrap(tc.id);
+              tc.card.requiresTarget
+                ? setTrapActivating(tc)
+                : activateTrap(tc.id);
             }}
             onClose={() => setTrapMenuTc(null)}
           />
         )}
       </AnimatePresence>
-
       {/* ZOOM */}
       <AnimatePresence>
         {(zoomCard || trapZoom) && (
           <motion.div
-            className="card-menu-overlay"
+            className="overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -552,15 +832,15 @@ const GameBoard: React.FC = () => {
             }}
           >
             <motion.div
-              className="zoom-card-wrapper"
+              className="zoom-wrap"
               initial={{ scale: 0.5 }}
-              animate={{ scale: 2 }}
+              animate={{ scale: 2.55 }}
               exit={{ scale: 0.5 }}
             >
               {zoomCard && <Card {...zoomCard} />}
               {trapZoom && <Card {...trapZoom.card} instanceId={trapZoom.id} />}
               <button
-                className="card-menu-close"
+                className="overlay-close"
                 onClick={() => {
                   setZoomCard(null);
                   setTrapZoom(null);
@@ -572,8 +852,7 @@ const GameBoard: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* TAIKINYS */}
+      {/* TARGET */}
       <AnimatePresence>
         {needsTarget && (
           <motion.div
@@ -594,8 +873,9 @@ const GameBoard: React.FC = () => {
                   <button
                     key={opp.id}
                     className="target-btn"
-                    onClick={() => handleSelectOpponent(opp.id)}
+                    onClick={() => handleSelectOpp(opp.id)}
                   >
+                    <Avatar name={opp.username} size={26} />
                     <span>{opp.username}</span>
                     <span className="target-count">{opp.cardCount}🃏</span>
                   </button>
@@ -604,7 +884,7 @@ const GameBoard: React.FC = () => {
               <button
                 className="btn-cancel"
                 onClick={() => {
-                  setSelectingTarget(null);
+                  setSelectTarget(null);
                   setTrapActivating(null);
                   clearActionNeedsTarget();
                 }}
@@ -615,8 +895,7 @@ const GameBoard: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* INSPEKCIJA */}
+      {/* INSPECT */}
       <AnimatePresence>
         {inspectResult && (
           <motion.div
@@ -626,7 +905,7 @@ const GameBoard: React.FC = () => {
             exit={{ opacity: 0 }}
           >
             <div className="modal modal--wide">
-              <h3>🔍 {inspectResult.targetUsername} kortos</h3>
+              <h3>🔍 {inspectResult.targetUsername}</h3>
               <div className="cards-scroll">
                 {inspectResult.cards.map((c) => (
                   <Card key={c.instanceId} {...c} />
@@ -639,7 +918,6 @@ const GameBoard: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
       {/* INSPECT STEAL */}
       <AnimatePresence>
         {inspectStealResult && (
@@ -650,7 +928,7 @@ const GameBoard: React.FC = () => {
             exit={{ opacity: 0 }}
           >
             <div className="modal modal--wide">
-              <h3>🗡 Pasirink kortą iš {inspectStealResult.targetUsername}</h3>
+              <h3>🗡 {inspectStealResult.targetUsername}</h3>
               <div className="cards-scroll">
                 {inspectStealResult.cards.map((c) => (
                   <div
@@ -674,18 +952,16 @@ const GameBoard: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
       {/* DISCARD MODAL */}
       <AnimatePresence>
-        {showDiscardModal && (
+        {showDiscard && (
           <DiscardModal
-            discardPile={discardPile_}
-            onClose={() => setShowDiscardModal(false)}
+            pile={discardPile_}
+            onClose={() => setShowDiscard(false)}
           />
         )}
       </AnimatePresence>
-
-      {/* ISTORIJA */}
+      {/* HISTORY PANEL */}
       <AnimatePresence>
         {showHistory && (
           <motion.div
@@ -698,165 +974,219 @@ const GameBoard: React.FC = () => {
             <div className="history-header">
               <span>📜 Istorija</span>
               <button
-                className="history-close"
+                className="overlay-close"
                 onClick={() => setShowHistory(false)}
               >
                 ✕
               </button>
             </div>
-            <div className="history-list" ref={historyRef}>
+            <div className="history-list" ref={histRef}>
               {history.length === 0 && (
-                <p className="history-empty">Nėra įvykių</p>
+                <p className="empty-note">Nėra įvykių</p>
               )}
               {history.map((e) => (
-                <div
-                  key={e.id}
-                  className={`history-entry history-entry--${e.type}`}
-                >
-                  <span className="history-time">{e.time}</span>
-                  <span className="history-msg">{e.msg}</span>
+                <div key={e.id} className={`hist-entry hist-entry--${e.type}`}>
+                  <span className="hist-time">{e.time}</span>
+                  <span className="hist-msg">{e.msg}</span>
                 </div>
               ))}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* TURN CHAIN — ėjimo kortų eilė dešinėje */}
-      <AnimatePresence>
-        {turnChain?.length > 0 && (
-          <motion.div
-            className="turn-chain"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-          >
-            <div className="turn-chain-label">Ėjimas</div>
-            {turnChain.map((entry, i) => (
-              <motion.div
-                key={entry.id}
-                className={`chain-entry chain-entry--${entry.card.type}`}
-                initial={{ opacity: 0, x: 30, scale: 0.8 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                transition={{ delay: i * 0.05 }}
-              >
-                <div className="chain-entry-player">👤 {entry.playerName}</div>
-                <div className="chain-entry-card">{entry.card.title}</div>
-                <div
-                  className={`chain-entry-type chain-entry-type--${entry.card.type}`}
-                >
-                  {entry.card.type}
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* REACTION WINDOW */}
+      {/* REACTION */}
       <AnimatePresence>
         {reactionWindow && (
-          <motion.div
-            className="reaction-overlay"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 20, opacity: 0 }}
-          >
-            <div className="reaction-box">
-              <div className="reaction-title">⚡ Reakcijos laikas!</div>
-              <div className="reaction-info">
-                <span className="reaction-card">
-                  {reactionWindow.card?.title || "Veiksmas"}
-                </span>
-                <span
-                  className={`reaction-timer ${reactionSecs <= 2 ? "reaction-timer--urgent" : ""}`}
-                >
-                  {reactionSecs}s
-                </span>
-              </div>
-              <div className="reaction-progress">
-                <motion.div
-                  className="reaction-progress-bar"
-                  initial={{ width: "100%" }}
-                  animate={{ width: "0%" }}
-                  transition={{
-                    duration: reactionWindow.durationMs / 1000,
-                    ease: "linear",
-                  }}
-                />
-              </div>
-              <div className="reaction-actions">
-                {myTraps
-                  .filter((tc) => tc.placedAtTurn !== turnNumber)
-                  .map((tc) => (
-                    <button
-                      key={tc.id}
-                      className="reaction-btn reaction-btn--trap"
-                      onClick={() => {
-                        if (tc.card.requiresTarget) setTrapActivating(tc);
-                        else activateTrapReaction(tc.id);
-                      }}
-                    >
-                      🪤 {tc.card.title}
-                    </button>
-                  ))}
-                {myCards_
-                  .filter((c) => c.isLightning && c.type === "response")
-                  .map((c) => (
-                    <button
-                      key={c.instanceId}
-                      className="reaction-btn reaction-btn--response"
-                      onClick={() => playCard(c.instanceId)}
-                    >
-                      🛡 {c.title}
-                    </button>
-                  ))}
-                <button
-                  className="reaction-btn reaction-btn--pass"
-                  onClick={() => passReaction()}
-                >
-                  ⏭ Praleisti
-                </button>
-              </div>
-            </div>
-          </motion.div>
+          <ReactionWindow
+            rw={reactionWindow}
+            secs={reactionSecs}
+            myTraps={myTraps}
+            myCards={myCards_}
+            turnNumber={turnNumber}
+            onPass={passReaction}
+            onPlayCard={(id) => playCard(id)}
+            onTrapReaction={(id, tid) => activateTrapReaction(id, tid)}
+            onSetTrapActivating={setTrapActivating}
+          />
         )}
       </AnimatePresence>
+      {/* ══════════════════════════════════════════════════════════════════════
+          MAIN LAYOUT — 8 VARIANT
+         ══════════════════════════════════════════════════════════════════════ */}
+      {/* TOP BAR: Round | Turn badge | Timer */}
 
-      {/* ĖJIMO JUOSTA */}
-      <div className={`turn-bar ${isMyTurn ? "turn-bar--mine" : ""}`}>
-        {isMyTurn
-          ? actionUsed
-            ? "✅ Laukiama..."
-            : "🐭 TAVO ĖJIMAS!"
-          : "Laukiame..."}
-      </div>
+      <header className="top-bar">
+        <span className="top-round">Round 1</span>
+        <div className={`turn-badge ${isMyTurn ? "turn-badge--mine" : ""}`}>
+          {isMyTurn
+            ? "Your turn"
+            : opponents_.find((o) => o.id === currentTurnPlayerId)?.username ||
+              "..."}
+          {isMyTurn && !actionUsed && <span className="ap-dot">⚡</span>}
+        </div>
+        {/* SIDE BUTTONS */}
+        <div className="side-btns">
+          <button
+            className="side-btn"
+            onClick={() => setShowHistory((v) => !v)}
+            title="Istorija"
+          >
+            📜
+          </button>
+          {canDeclare && (
+            <motion.button
+              className="side-btn side-btn--mm"
+              onClick={declareMadMouse}
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+            >
+              🐭
+            </motion.button>
+          )}
+        </div>
+        <span className="top-timer">{fmt(elapsed)}</span>
+      </header>
 
-      {/* POKERIO STALAS */}
-      <div className="poker-table-wrap">
-        <div className="poker-table">
+      {/* MAIN CONTENT AND SIDE SECTION */}
+      <div className="main-content-side-section">
+        {/* MAIN CONTENT SECTION */}
+        <div className="main-content-section flex-1">
+          {/* PLAYERS IN ORDER */}
+          <section className="players-section">
+            <div className="section-label">PLAYERS IN ORDER</div>
+            <div className="players-row">
+              {allOrdered.map((p) => {
+                if (!p) return null;
+                const isMe = p.id === mySocketId;
+                const isActive = currentTurnPlayerId === p.id;
+                const isMM = madMousePlayerId === p.id;
+                const cnt = isMe ? myCards_.length : p.cardCount;
+                return (
+                  <div
+                    key={p.id}
+                    className={`player-slot ${isActive ? "player-slot--active" : ""} ${isMe ? "player-slot--me" : ""}`}
+                  >
+                    <Avatar
+                      name={p.username}
+                      size={38}
+                      active={isActive}
+                      isMe={isMe}
+                      cardCount={cnt}
+                    />
+                    <span className="player-name">
+                      {isMe ? "You" : p.username}
+                    </span>
+                    {isMM && (
+                      <motion.span
+                        className="mm-badge"
+                        animate={{ opacity: [1, 0.3, 1] }}
+                        transition={{ repeat: Infinity, duration: 0.8 }}
+                      >
+                        🐭
+                      </motion.span>
+                    )}
+                    {!p.isConnected && (
+                      <span className="offline-badge">📵</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+          {/* CHAIN — WILL RESOLVE IN ORDER */}
+          <section className="chain-section">
+            <div className="section-label">CHAIN (WILL RESOLVE IN ORDER)</div>
+            <div className="chain-row">
+              {chain.length === 0 && (
+                <span className="chain-empty">Nėra aktyvių kortų</span>
+              )}
+              {chain.map((e, i) => (
+                <React.Fragment key={e.id}>
+                  <div
+                    className={`chain-slot ${stageActive && stageIdx === i ? "chain-slot--active" : i < stageIdx ? "chain-slot--done" : ""}`}
+                  >
+                    <span className="chain-num">{i + 1}</span>
+                    {e.isTrap ? (
+                      <div className="chain-facedown">?</div>
+                    ) : (
+                      <Card {...e.card} instanceId={`chain-${e.id}`} compact />
+                    )}
+                    <span className="chain-player">
+                      {e.playerName.slice(0, 6)}
+                    </span>
+                  </div>
+                  {i < chain.length - 1 && (
+                    <span className="chain-arrow">→</span>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </section>
+          {/* MIDDLE AREA: Traps + Deck + Discard (dešinėje) */}
+          <section className="middle-section">
+            {/* Traps */}
+            <div className="traps-area">
+              <div className="section-label">TRAPS ON TABLE (FACE DOWN)</div>
+              <div className="traps-row">
+                {trapCards_.map((tc) => (
+                  <div
+                    key={tc.id}
+                    className={`trap-chip ${tc.ownerId === mySocketId ? "trap-chip--mine" : ""}`}
+                    onClick={() =>
+                      tc.ownerId === mySocketId ? setTrapMenuTc(tc) : null
+                    }
+                  >
+                    <div className="trap trap-facedown">
+                      {tc.ownerId === mySocketId ? "🪤" : "?"}
+                    </div>
+                    <span className="trap-owner">
+                      {tc.ownerName.slice(0, 4)}
+                    </span>
+                    {tc.placedAtTurn === turnNumber &&
+                      tc.ownerId === mySocketId && (
+                        <span className="trap-cooldown-dot">⏳</span>
+                      )}
+                  </div>
+                ))}
+                <div className="trap trap-add">+</div>
+              </div>
+            </div>
+          </section>
           {/* FLASH */}
           <AnimatePresence>
-            {flashEmoji && (
+            {flash && (
               <motion.div
-                className="table-flash"
+                className="flash-center"
                 initial={{ opacity: 0, scale: 0.3 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 2 }}
                 transition={{ duration: 0.4 }}
               >
-                {flashEmoji}
+                {flash}
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* CENTRAS */}
-          <div className="table-center">
-            <div className="pile-wrap">
-              <span className="pile-lbl">Kaladė ({deckCount})</span>
+          {/* MAD MOUSE banner */}
+          {iMadMouse && (
+            <motion.div
+              className="mm-banner"
+              animate={{ opacity: [1, 0.5, 1] }}
+              transition={{ repeat: Infinity, duration: 0.9 }}
+            >
+              🐭 MAD MOUSE paskelbtas! Laukiame rato...
+            </motion.div>
+          )}
+        </div>
+        {/* MAIN SIDE SECTION */}
+        <div className="main-side-section w-[150px] shrink-0">
+          {/* Deck + Discard — DEŠINĖJE */}
+          <div className="piles-center">
+            <div className="pile-col">
               <div
                 className={`deck-stack ${isMyTurn && !actionUsed && myCards_.length < (handLimit || 10) ? "deck-stack--active" : ""}`}
-                style={{ "--layers": visualLayers } as any}
+                style={{ "--layers": vLayers } as any}
                 onClick={() =>
                   isMyTurn &&
                   !actionUsed &&
@@ -864,236 +1194,50 @@ const GameBoard: React.FC = () => {
                   drawCard()
                 }
               >
-                {deckCount > 0 ? (
-                  <span className="deck-mouse">🐭</span>
-                ) : (
-                  <span className="pile-empty">–</span>
-                )}
+                <span className="deck-num">{deckCount}</span>
               </div>
+              <span className="pile-label">DECK</span>
             </div>
-            <div className="pile-wrap">
-              <span className="pile-lbl">Išmesta ({discardPile_.length})</span>
+            <div className="pile-col">
               <div
-                className="discard-stack clickable"
-                onClick={() => setShowDiscardModal(true)}
+                className="discard-pile clickable"
+                onClick={() => setShowDiscard(true)}
               >
-                {discardPile_.slice(-4).map((card, i) => (
+                {discardPile_.slice(-3).map((c, i) => (
                   <div
-                    key={`${card.instanceId}-${i}`}
+                    key={`${c.instanceId}-${i}`}
                     className="discard-mini"
                     style={{
-                      background: `${typeColor[card.type]}22`,
-                      borderColor: typeColor[card.type] || "#555",
-                      transform: `rotate(${(i - 1.5) * 7}deg) translateY(${i * -2}px)`,
+                      transform: `rotate(${(i - 1) * 9}deg) translateY(${i * -2}px)`,
                       zIndex: i,
                     }}
                   />
                 ))}
+                {discardPile_.length > 0 && (
+                  <span className="discard-count-badge">
+                    {discardPile_.length}
+                  </span>
+                )}
                 {discardPile_.length === 0 && (
-                  <span className="pile-empty">–</span>
+                  <span className="pile-empty-lbl">–</span>
                 )}
               </div>
+              <span className="pile-label">DISCARD</span>
             </div>
           </div>
-
-          {/* MANO IKONAS */}
-          <div
-            className="player-seat player-seat--me"
-            style={{
-              left: `${myPos.x}%`,
-              top: `${myPos.y}%`,
-              transform: "translate(-50%,-50%)",
-            }}
-          >
-            {myTraps.length > 0 && (
-              <div className="seat-traps">
-                {myTraps.map((tc, ti) => (
-                  <div
-                    key={tc.id}
-                    className="trap-face-down"
-                    style={{ transform: `rotate(${(ti - 1) * 12}deg)` }}
-                    onClick={() => setTrapMenuTc(tc)}
-                  />
-                ))}
-              </div>
-            )}
-            <div
-              className={`player-icon player-icon--me ${isMyTurn ? "player-icon--active" : ""}`}
-            >
-              <PawnIcon size={20} />
-            </div>
-            {iMadMousePending && (
-              <motion.div
-                className="mad-mouse-pending-badge"
-                animate={{ opacity: [1, 0.3, 1] }}
-                transition={{ repeat: Infinity, duration: 0.8 }}
-              >
-                🐭 MAD MOUSE!
-              </motion.div>
-            )}
-            <div className="seat-name seat-name--me">Tu</div>
-            <div className="seat-count">{myCards_.length}🃏</div>
-          </div>
-
-          {/* OPONENTAI */}
-          {otherPlayers.map((opp, i) => {
-            const pos = getOtherPos(i, otherPlayers.length);
-            const isActive = currentTurnPlayerId === opp.id;
-            const oppTraps = trapsByOwner(opp.id);
-            return (
-              <div
-                key={opp.id}
-                className={`player-seat ${isActive ? "player-seat--active" : ""} ${!opp.isConnected ? "player-seat--offline" : ""}`}
-                style={{
-                  left: `${pos.x}%`,
-                  top: `${pos.y}%`,
-                  transform: "translate(-50%,-50%)",
-                }}
-              >
-                {oppTraps.length > 0 && (
-                  <div className="seat-traps">
-                    {oppTraps.map((tc, ti) => (
-                      <div
-                        key={tc.id}
-                        className="trap-face-down"
-                        style={{ transform: `rotate(${(ti - 1) * 12}deg)` }}
-                      />
-                    ))}
-                  </div>
-                )}
-                <div
-                  className={`player-icon ${isActive ? "player-icon--active" : ""}`}
-                >
-                  <PawnIcon size={20} />
-                </div>
-                {/* 5 punktas — rodo ką priešas daro */}
-                {isActive && !isMyTurn && (
-                  <motion.div
-                    className="opponent-action-hint"
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    ▶ ėjimas
-                  </motion.div>
-                )}
-                {opp.madMousePending && (
-                  <motion.div
-                    className="mad-mouse-pending-badge"
-                    animate={{ opacity: [1, 0.3, 1] }}
-                    transition={{ repeat: Infinity, duration: 0.8 }}
-                  >
-                    🐭 MAD MOUSE!
-                  </motion.div>
-                )}
-                <div className="seat-name">{opp.username}</div>
-                <div className="seat-count">{opp.cardCount}🃏</div>
-                {opp.curses?.length > 0 && <div className="seat-curse">💀</div>}
-                {!opp.isConnected && <div className="seat-offline">📵</div>}
-              </div>
-            );
-          })}
         </div>
       </div>
-
-      {/* ANT STALO KORTOS */}
-      {tableCards_.length > 0 && (
-        <div className="table-cards-row">
-          <span className="table-cards-lbl">🃏 Ant stalo</span>
-          {tableCards_.map((tc) => (
-            <div
-              key={tc.id}
-              className={`table-card-chip table-card-chip--${tc.card.type} ${tc.ownerId === mySocketId ? "table-card-chip--mine" : ""}`}
-              onClick={() =>
-                tc.ownerId === mySocketId ? setTrapMenuTc(tc) : null
-              }
-              style={{
-                cursor: tc.ownerId === mySocketId ? "pointer" : "default",
-              }}
-            >
-              <div className="trap-face-down trap-face-down--sm" />
-              <span className="table-card-owner">👤 {tc.ownerName}</span>
-              {tc.turnsLeft !== null && (
-                <span className="table-card-turns">⏱{tc.turnsLeft}</span>
-              )}
-              {tc.ownerId === mySocketId && tc.placedAtTurn === turnNumber && (
-                <span className="table-card-cooldown">⏳</span>
-              )}
-              {tc.ownerId === mySocketId && (
-                <span className="table-card-hint">👆</span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* MAD MOUSE BANNER */}
-      {iMadMousePending && (
-        <motion.div
-          className="my-mad-mouse-banner"
-          animate={{ opacity: [1, 0.5, 1] }}
-          transition={{ repeat: Infinity, duration: 0.9 }}
-        >
-          🐭 MAD MOUSE paskelbtas! Laukiame rato...
-        </motion.div>
-      )}
-
-      {/* DEŠINĖ PANELĖ */}
-      <div className="side-btns">
-        <button
-          className="btn-history"
-          onClick={() => setShowHistory((v) => !v)}
-        >
-          📜
-        </button>
-        {canDeclareWin && (
-          <motion.button
-            className="btn-mad-mouse"
-            onClick={declareMadMouse}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-          >
-            🐭
-            <br />
-            Mad
-            <br />
-            Mouse!
-          </motion.button>
-        )}
-      </div>
-
-      {/* RANKA — 6 punktas: nėra cutoff, 7 punktas: galima scrollinti */}
-      <div className="hand-area">
-        <div className="hand-header">
-          <div className="my-seat-info">
-            <div
-              className={`player-icon player-icon--me ${isMyTurn ? "player-icon--active" : ""}`}
-            >
-              <PawnIcon size={18} />
-            </div>
-            <span className="hand-lbl">
-              Tu · {myCards_.length}/{handLimit || 10}🃏
-              {iMadMousePending && " 🐭"}
-            </span>
-          </div>
-          {isMyTurn && (
-            <div
-              className={`action-point ${actionUsed ? "action-point--used" : "action-point--available"}`}
-            >
-              {actionUsed ? "✅ Laukiama" : "⚡ 1 veiksmas"}
-            </div>
-          )}
-        </div>
-        {/* 7 punktas — horizontal scroll, kortos neatsiranda */}
-        <div className="hand-cards">
+      {/* HAND */}
+      <section className="hand-section">
+        <div className="hand-label">YOUR HAND ({myCards_.length})</div>
+        <div className="hand-row">
           <AnimatePresence mode="popLayout">
             {myCards_.map((card, i) => (
               <motion.div
                 key={card.instanceId}
                 className="hand-card"
                 style={{
-                  marginLeft: i === 0 ? 0 : "clamp(-50px, -12vw, -30px)",
+                  marginLeft: i === 0 ? 0 : "clamp(-1px,-1vw,-1px)",
                   zIndex: i,
                 }}
                 initial={{ y: 80, opacity: 0, scale: 0.7 }}
@@ -1101,14 +1245,14 @@ const GameBoard: React.FC = () => {
                 exit={{ y: -80, opacity: 0, scale: 0.7 }}
                 transition={{ type: "spring", damping: 18, stiffness: 200 }}
                 whileHover={{
-                  y: -20,
-                  zIndex: 100,
+                  y: -1,
+                  zIndex: 1,
                   transition: { duration: 0.1 },
                 }}
                 onClick={() => !card.hidden && setMenuCard(card)}
               >
                 {card.hidden ? (
-                  <div className="card-hidden">?</div>
+                  <div className="card-hidden-slot">?</div>
                 ) : (
                   <Card {...card} />
                 )}
@@ -1119,7 +1263,7 @@ const GameBoard: React.FC = () => {
             <p className="hand-empty">Rankoje nėra kortų — trauk iš kaladės!</p>
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 };

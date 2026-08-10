@@ -41,7 +41,7 @@ function App() {
     <Router>
       <div className="min-h-screen bg-slate-900 text-white font-sans selection:bg-indigo-500/30">
         {/* Header - rodomas tik prisijungus */}
-        {username && (
+        {/* {username && (
           <header className="bg-slate-800/80 backdrop-blur-md border-b border-slate-700 p-4 sticky top-0 z-50">
             <div className="container mx-auto flex justify-between items-center">
               <div
@@ -69,9 +69,9 @@ function App() {
               </div>
             </div>
           </header>
-        )}
+        )} */}
 
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 py-4">
           <Routes>
             <Route
               path="/"
@@ -101,14 +101,14 @@ function App() {
           </Routes>
         </main>
 
-        <footer className="py-10 text-center opacity-50">
+        {/* <footer className="py-10 text-center opacity-50">
           <div className="inline-block px-4 py-1 rounded-full border border-slate-800">
             <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.5em]">
               Mouse Engine v1.0.4{" "}
               <span className="text-green-600 ml-2 animate-pulse">●</span>
             </p>
           </div>
-        </footer>
+        </footer> */}
       </div>
     </Router>
   );
