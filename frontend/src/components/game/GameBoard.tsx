@@ -234,16 +234,12 @@ const CardMenu: React.FC<{
           <button className="menu-btn menu-btn--inspect" onClick={onInspect}>
             🔍 Peržiūrėti
           </button>
-          {canPlay && !isTrap && (
-            <button className="menu-btn menu-btn--play" onClick={onPlay}>
-              ▶ Panaudoti
-            </button>
-          )}
-          {canPlay && isTrap && (
-            <button className="menu-btn menu-btn--trap" onClick={onPlaceTrap}>
-              🪤 Padėti ant stalo
-            </button>
-          )}
+          <button className="menu-btn menu-btn--play" onClick={onPlay}>
+            ▶ Panaudoti
+          </button>
+          <button className="menu-btn menu-btn--trap" onClick={onPlaceTrap}>
+            🪤 Padėti ant stalo
+          </button>
           {turnNumber === 0 && !mulliganUsed && (
             <button
               className="menu-btn menu-btn--mulligan"
@@ -252,11 +248,9 @@ const CardMenu: React.FC<{
               🔀 Mulligan
             </button>
           )}
-          {isMyTurn && !actionUsed && (
-            <button className="menu-btn menu-btn--discard" onClick={onDiscard}>
-              🗑 Išmesti
-            </button>
-          )}
+          <button className="menu-btn menu-btn--discard" onClick={onDiscard}>
+            🗑 Išmesti
+          </button>
         </div>
         <button className="overlay-close" onClick={onClose}>
           ✕
@@ -477,7 +471,9 @@ const GameBoard: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const {
+    // Būsenos (State)
     myCards,
+    myTrapZoneCards,
     opponents,
     currentTurnPlayerId,
     deckCount,
@@ -495,12 +491,15 @@ const GameBoard: React.FC = () => {
     madMousePlayerId,
     reactionWindow,
     mySocketId,
+
+    // Funkcijos (Actions)
     initGame,
     playCard,
     selectTarget,
     activateTrap,
     inspectStealPick,
     drawCard,
+    endTurn,
     declareMadMouse,
     mulligan,
     restartGame,
@@ -659,12 +658,14 @@ const GameBoard: React.FC = () => {
   }, [reactionWindow?.startedAt]);
 
   const myCards_ = myCards || [];
+  const myTrapZoneCards_ = myTrapZoneCards || [];
   const opponents_ = opponents || [];
   const tableCards_ = tableCards || [];
   const discardPile_ = discardPile || [];
   const isMyTurn = currentTurnPlayerId === mySocketId;
   const iMadMouse = madMousePlayerId === mySocketId;
-  const canDeclare = myCards_.length >= (handLimit || 10) && !madMousePlayerId;
+  const canDeclare =
+    myCards_.length >= (handLimit || 100000) && !madMousePlayerId;
   const vLayers = Math.min(Math.floor(deckCount / 4), 12);
   const otherPlayers = opponents_.filter((o) => o.id !== socket.id);
   const myTraps = tableCards_.filter(
@@ -709,6 +710,15 @@ const GameBoard: React.FC = () => {
   }
   const needsTarget = selectingTarget || actionNeedsTarget || trapActivating;
 
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  // Peliuko ratuko pavertimas į horizontalų scroll
+  const handleWheel = (e: React.WheelEvent) => {
+    if (carouselRef.current) {
+      carouselRef.current.scrollLeft += e.deltaY;
+    }
+  };
+
   // ── WINNER ────────────────────────────────────────────────────────────────
   if (winner)
     return (
@@ -741,6 +751,8 @@ const GameBoard: React.FC = () => {
         </motion.div>
       </div>
     );
+
+  // console.log("trapcards", trapCards_);
 
   return (
     <div className={`board rounded-[20px] ${isMyTurn ? "board--my-turn" : ""}`}>
@@ -1185,12 +1197,12 @@ const GameBoard: React.FC = () => {
           <div className="piles-center">
             <div className="pile-col">
               <div
-                className={`deck-stack ${isMyTurn && !actionUsed && myCards_.length < (handLimit || 10) ? "deck-stack--active" : ""}`}
+                className={`deck-stack ${isMyTurn && !actionUsed && myCards_.length < (handLimit || 100000) ? "deck-stack--active" : ""}`}
                 style={{ "--layers": vLayers } as any}
                 onClick={() =>
                   isMyTurn &&
                   !actionUsed &&
-                  myCards_.length < (handLimit || 10) &&
+                  myCards_.length < (handLimit || 100000) &&
                   drawCard()
                 }
               >
@@ -1225,42 +1237,57 @@ const GameBoard: React.FC = () => {
               <span className="pile-label">DISCARD</span>
             </div>
           </div>
+          <div>
+            <button className="end-turn-btn" onClick={() => endTurn()}>
+              End turn
+            </button>
+          </div>
         </div>
       </div>
       {/* HAND */}
       <section className="hand-section">
         <div className="hand-label">YOUR HAND ({myCards_.length})</div>
-        <div className="hand-row">
-          <AnimatePresence mode="popLayout">
-            {myCards_.map((card, i) => (
-              <motion.div
-                key={card.instanceId}
-                className="hand-card"
-                style={{
-                  marginLeft: i === 0 ? 0 : "clamp(-1px,-1vw,-1px)",
-                  zIndex: i,
-                }}
-                initial={{ y: 80, opacity: 0, scale: 0.7 }}
-                animate={{ y: 0, opacity: 1, scale: 1 }}
-                exit={{ y: -80, opacity: 0, scale: 0.7 }}
-                transition={{ type: "spring", damping: 18, stiffness: 200 }}
-                whileHover={{
-                  y: -1,
-                  zIndex: 1,
-                  transition: { duration: 0.1 },
-                }}
-                onClick={() => !card.hidden && setMenuCard(card)}
-              >
-                {card.hidden ? (
-                  <div className="card-hidden-slot">?</div>
-                ) : (
-                  <Card {...card} />
-                )}
-              </motion.div>
-            ))}
-          </AnimatePresence>
+        <div
+          className="hand-carousel-container"
+          ref={carouselRef}
+          onWheel={handleWheel}
+        >
+          <div className="hand-cards-track">
+            <AnimatePresence mode="popLayout">
+              {myCards_.map((card: any, i: number) => (
+                <motion.div
+                  key={card.instanceId}
+                  layout
+                  className="hand-card-item"
+                  style={{
+                    marginLeft: i === 0 ? 0 : "clamp(-1px, -1vw, -1px)",
+                    zIndex: i,
+                  }}
+                  initial={{ y: 80, opacity: 0, scale: 0.7 }}
+                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                  exit={{ y: -80, opacity: 0, scale: 0.7 }}
+                  transition={{ type: "spring", damping: 18, stiffness: 200 }}
+                  whileHover={{
+                    y: -25,
+                    zIndex: 999,
+                    transition: { duration: 0.1 },
+                  }}
+                  onClick={() => !card.hidden && setMenuCard(card)}
+                >
+                  {card.hidden ? (
+                    <div className="card-hidden-slot">?</div>
+                  ) : (
+                    <Card {...card} />
+                  )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+
           {myCards_.length === 0 && (
-            <p className="hand-empty">Rankoje nėra kortų — trauk iš kaladės!</p>
+            <p className="hand-cards-empty">
+              Rankoje nėra kortų — trauk iš kaladės!
+            </p>
           )}
         </div>
       </section>

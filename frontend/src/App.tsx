@@ -16,7 +16,32 @@ import RoomPage from "./pages/RoomPage";
 import GamePage from "./pages/GamePage";
 
 function App() {
-  const { username } = useAuthStore();
+  const { username, activeGameId, setActiveGameId } = useAuthStore();
+
+  useEffect(() => {
+    // 1. Loguoja VISUS gautus įvykius iš serverio
+    socket.onAny((event, ...args) => {
+      console.log(
+        `%c 📥 [Gauta iš Serverio] -> ${event}`,
+        "color: #00ff00; font-weight: bold;",
+        args,
+      );
+    });
+
+    // 2. Loguoja VISUS išsiųstus įvykius iš React
+    socket.onAnyOutgoing((event, ...args) => {
+      console.log(
+        `%c 📤 [Išsiųsta iš React] -> ${event}`,
+        "color: #00bfff; font-weight: bold;",
+        args,
+      );
+    });
+
+    return () => {
+      socket.offAny();
+      socket.offAnyOutgoing();
+    };
+  }, []);
 
   useEffect(() => {
     // 1. Jungiamės prie socket tik jei turime vartotojo vardą
@@ -26,51 +51,52 @@ function App() {
       }
     }
 
-    // 2. Globalios klaidos (nebūtina, bet naudinga)
-    socket.on("error_message", (msg) => {
+    // 2. AUTOMATINIS REJOIN PO F5 PERKROVIMO
+    const handleConnect = () => {
+      const currentUsername = useAuthStore.getState().username;
+      const currentGameId = useAuthStore.getState().activeGameId;
+
+      if (currentUsername && currentGameId) {
+        console.log(
+          `🔄 Bandoma grįžti į žaidimą po perkrovimo: ${currentGameId}`,
+        );
+        socket.emit("rejoin_game", {
+          roomId: currentGameId,
+          username: currentUsername,
+        });
+      }
+    };
+
+    // 3. Jei nepavyko grįžti (žaidimas baigėsi arba buvo ištrintas)
+    const handleRejoinFailed = (err: { message: string }) => {
+      console.warn("⚠️ Nepavyko grįžti į žaidimą:", err?.message);
+      setActiveGameId(null); // Ištriname seną ID, nes žaidimo nebėra
+    };
+
+    // Globalios klaidos
+    const handleError = (msg: string) => {
       alert(msg);
-    });
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("rejoin_failed", handleRejoinFailed);
+    socket.on("error_message", handleError);
+
+    // Jei socket JAU buvo prisijungęs užsikraunant komponentui
+    if (socket.connected) {
+      handleConnect();
+    }
 
     return () => {
-      socket.off("error_message");
-      // update_rooms čia NEBEKLAUSOME - tai darys LobbyListPage ir RoomPage atskirai
+      socket.off("connect", handleConnect);
+      socket.off("rejoin_failed", handleRejoinFailed);
+      socket.off("error_message", handleError);
     };
-  }, [username]);
+  }, [username, setActiveGameId]);
 
   return (
     <Router>
       <div className="min-h-screen bg-slate-900 text-white font-sans selection:bg-indigo-500/30">
-        {/* Header - rodomas tik prisijungus */}
-        {/* {username && (
-          <header className="bg-slate-800/80 backdrop-blur-md border-b border-slate-700 p-4 sticky top-0 z-50">
-            <div className="container mx-auto flex justify-between items-center">
-              <div
-                className="flex items-center gap-2 cursor-pointer group"
-                onClick={() => (window.location.href = "/lobby")}
-              >
-                <span className="text-2xl group-hover:rotate-12 transition-transform">
-                  🐭
-                </span>
-                <h1 className="text-xl font-black italic tracking-tighter uppercase">
-                  Mad <span className="text-indigo-500">Mouse</span>
-                </h1>
-              </div>
-
-              <div className="flex items-center gap-3 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-700">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  Operative:
-                </span>
-                <span className="text-sm font-black text-indigo-400">
-                  {username}
-                </span>
-                <div className="w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center text-[10px] font-black text-white shadow-[0_0_10px_rgba(99,102,241,0.4)]">
-                  {username[0].toUpperCase()}
-                </div>
-              </div>
-            </div>
-          </header>
-        )} */}
-
         <main className="container mx-auto px-4 py-4">
           <Routes>
             <Route
@@ -100,15 +126,6 @@ function App() {
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
-
-        {/* <footer className="py-10 text-center opacity-50">
-          <div className="inline-block px-4 py-1 rounded-full border border-slate-800">
-            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.5em]">
-              Mouse Engine v1.0.4{" "}
-              <span className="text-green-600 ml-2 animate-pulse">●</span>
-            </p>
-          </div>
-        </footer> */}
       </div>
     </Router>
   );

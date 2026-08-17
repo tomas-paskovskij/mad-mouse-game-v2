@@ -19,10 +19,10 @@ instrument(io, { auth: false, mode: "development" });
 
 let rooms = [];
 const games = {};
-const HAND_LIMIT = 10;
+const HAND_LIMIT = 100000;
 const WIN_CONDITION = 10;
 const STARTING_CARDS = 3;
-const REACTION_MS = 5000;
+const REACTION_MS = 55000;
 
 const handlePlayerExit = (socketId, roomId = null) => {
   rooms.forEach((room) => {
@@ -78,6 +78,7 @@ function broadcastGameState(roomId) {
       myCards: isBlind
         ? player.cards.map((c) => ({ ...c, hidden: true }))
         : player.cards,
+      myTrapZoneCards: [],
       opponents: game.players.map((p) => ({
         id: p.id,
         username: p.username,
@@ -912,9 +913,68 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
   broadcastGameState(roomId);
 }
 
+function restorePlayerConnection(socket, username, roomId = null) {
+  let found = false;
+
+  rooms.forEach((room) => {
+    if (roomId && room.id !== roomId) return;
+
+    const player = room.players.find(
+      (p) => p.username === username || p.id === socket.id,
+    );
+
+    if (player) {
+      player.id = socket.id;
+      player.isConnected = true;
+      if (player.disconnectTimer) {
+        clearTimeout(player.disconnectTimer);
+        player.disconnectTimer = null;
+      }
+      found = true;
+    }
+  });
+
+  Object.keys(games).forEach((gameRoomId) => {
+    if (roomId && gameRoomId !== roomId) return;
+
+    const game = games[gameRoomId];
+    const player = game.players.find(
+      (p) => p.username === username || p.id === socket.id,
+    );
+
+    if (player) {
+      player.id = socket.id;
+      player.isConnected = true;
+      if (player.disconnectTimer) {
+        clearTimeout(player.disconnectTimer);
+        player.disconnectTimer = null;
+      }
+      found = true;
+    }
+  });
+
+  return found;
+}
+
 // ─── SOCKET EVENTS ─────────────────────────────────────────────────────────────
 io.on("connection", (socket) => {
-  console.log("Prisijungė:", socket.id);
+  //
+
+  // socket.onAny((eventName, ...args) => {
+  //   console.log(`📥 [Socket IN] -> ${eventName}:`, args);
+  // });
+
+  // // Išsaugok originalų emit, kad galėtum loginti išeinančius įvykius
+  // const originalEmit = socket.emit;
+  // socket.emit = function (eventName, ...args) {
+  //   console.log(`📤 [Socket OUT] -> ${eventName}:`, args);
+  //   return originalEmit.apply(this, [eventName, ...args]);
+  // };
+
+  const username = socket.handshake.auth?.username || null;
+  socket.data.username = username;
+
+  console.log("Prisijungė:", username || "guest");
   socket.emit("update_rooms", rooms);
 
   socket.on("join_game_room", (data) => {
@@ -927,6 +987,8 @@ io.on("connection", (socket) => {
         player.id = socket.id;
         player.isConnected = true;
       }
+      const resolvedUsername = data.username || socket.data.username || null;
+      restorePlayerConnection(socket, resolvedUsername, roomId);
       broadcastGameState(roomId);
     }
   });
@@ -963,6 +1025,8 @@ io.on("connection", (socket) => {
       already.id = socket.id;
     }
     socket.join(roomId);
+    const resolvedUsername = data.username || socket.data.username || null;
+    restorePlayerConnection(socket, resolvedUsername, roomId);
     emitRoomUpdate(roomId);
     socket.emit("join_success", roomId);
   });
@@ -1106,154 +1170,86 @@ io.on("connection", (socket) => {
   socket.on("play_card", (data) => {
     const { roomId, cardInstanceId, targetId, extraData } = data;
     const game = games[roomId];
+
+    // 1. Pagrindinės patikros
     if (!game || game.winner) return;
     const player = game.players.find((p) => p.id === socket.id);
+    /*
+    // Galima naudoti tik per savo ejima
+    const player = game.players.find((p) => p.id === socket.id);
     if (!player) return;
+
+    const isMyTurn = game.players[game.currentTurnIndex].id === socket.id;
+    if (!isMyTurn) return socket.emit("error_message", "Ne tavo ėjimas!");
+    if (game.actionUsed)
+      return socket.emit("error_message", "Jau panaudojai veiksmą!");
+    */
+
+    // 2. Surandame kortą žaidėjo rankoje
     const cardIdx = player.cards.findIndex(
       (c) => c.instanceId === cardInstanceId,
     );
     if (cardIdx === -1) return;
+
     const card = player.cards[cardIdx];
-    const isMyTurn = game.players[game.currentTurnIndex].id === socket.id;
 
-    // Response — veikia bet kada (2 punktas pataisytas)
-    if (card.isLightning && card.type === "response") {
-      player.cards.splice(cardIdx, 1);
-      game.discardPile.push(makeEntry(card, player.username));
-
-      if (card.effect === "cancel_action") {
-        if (game.reactionWindow) {
-          const rw = game.reactionWindow;
-          if (rw.timer) clearTimeout(rw.timer);
-          game.reactionWindow = null;
-          io.to(roomId).emit("reaction_window_end");
-          io.to(roomId).emit("game_notification", {
-            message: `🚫 ${player.username} atšaukė veiksmą!`,
-            type: "response",
-          });
-          broadcastGameState(roomId);
-          return;
-        }
-        if (game.pendingAction) {
-          game.pendingAction = null;
-          io.to(roomId).emit("game_notification", {
-            message: `🚫 ${player.username} atšaukė!`,
-            type: "response",
-          });
-          broadcastGameState(roomId);
-          return;
-        }
-        return;
-      }
-      if (card.effect === "reflect_action") {
-        if (game.reactionWindow) {
-          const rw = game.reactionWindow;
-          if (rw.timer) clearTimeout(rw.timer);
-          game.reactionWindow = null;
-          io.to(roomId).emit("reaction_window_end");
-          io.to(roomId).emit("game_notification", {
-            message: `↩️ ${player.username} atspindi!`,
-            type: "response",
-          });
-          if (rw.card)
-            executeEffect(
-              roomId,
-              rw.targetId || socket.id,
-              rw.card,
-              rw.initiatorId,
-              null,
-            );
-          setTimeout(() => {
-            if (games[roomId] && !games[roomId].winner) nextTurn(roomId);
-          }, 700);
-          return;
-        }
-        if (game.pendingAction) {
-          const orig = game.pendingAction;
-          game.pendingAction = null;
-          executeEffect(
-            roomId,
-            orig.targetId || socket.id,
-            orig.card,
-            orig.initiatorId,
-            null,
-          );
-          return;
-        }
-        return;
-      }
-      if (card.effect === "shield") {
-        executeEffect(roomId, socket.id, card, null, null);
-        return;
-      }
-      if (card.effect === "delay_action") {
-        if (game.reactionWindow) {
-          const rw = game.reactionWindow;
-          if (rw.timer) clearTimeout(rw.timer);
-          game.reactionWindow = null;
-          io.to(roomId).emit("reaction_window_end");
-          io.to(roomId).emit("game_notification", {
-            message: `⏱ Veiksmas atidėtas!`,
-            type: "response",
-          });
-          broadcastGameState(roomId);
-          return;
-        }
-        return;
-      }
-      return;
-    }
-
-    if (!isMyTurn) return socket.emit("error_message", "Ne tavo ėjimas!");
-    if (game.actionUsed)
-      return socket.emit("error_message", "Jau panaudojai veiksmą!");
-
+    // 2+ Ismetam korta (extra move)
     if (extraData?.discard) {
       player.cards.splice(cardIdx, 1);
+
       game.discardPile.push(makeEntry(card, player.username));
+
       game.actionUsed = true;
+
       io.to(roomId).emit("game_notification", {
         message: `${player.username} išmetė kortą.`,
+
         type: "action",
       });
+
       broadcastGameState(roomId);
-      setTimeout(() => {
-        if (games[roomId] && !games[roomId].winner) nextTurn(roomId);
-      }, 700);
+
       return;
     }
 
+    // 4. LOGIKA: Jei trap -> į spąstų zoną, jei ne -> į išmestų krūvą
+    if (card.type === "trap") {
+      game.tableCards.push({
+        id: `tc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        card,
+        ownerId: player.id,
+        ownerName: player.username,
+        placedAt: game.tableCards.length + 1,
+        turnsLeft: null,
+        canActivate: true,
+        placedAtTurn: game.turnNumber,
+      });
+      io.to(roomId).emit("game_notification", {
+        message: `🪤 ${player.username} padėjo spąstus!`,
+        type: "trap",
+      });
+
+      console.log("player------", player);
+      player.cards.splice(cardIdx, 1);
+      broadcastGameState(roomId);
+      return;
+      // player.myTrapZoneCards.push(makeEntry(card, player.username));
+    }
+
+    // 3. Išimame kortą iš rankos ir dedame į išmestų kortų krūvą
     player.cards.splice(cardIdx, 1);
-    if (card.type !== "trap")
-      game.discardPile.push(makeEntry(card, player.username));
+    game.discardPile.push(makeEntry(card, player.username));
     game.actionUsed = true;
 
-    if (card.requiresTarget && !targetId) {
-      game.pendingAction = { card, initiatorId: socket.id };
-      io.to(roomId).emit("action_needs_target", {
-        card,
-        initiatorId: socket.id,
-      });
-      broadcastGameState(roomId);
-      return;
-    }
-
-    // Pranešame visiems apie padėtą kortą
-    const pName = player.username;
+    // 4. Informuojame visus žaidėjus kambaryje apie padėtą kortą
     io.to(roomId).emit("card_played_display", {
       card: { ...card },
-      playerName: pName,
+      playerName: player.username,
       playerId: socket.id,
     });
 
-    // Visi veiksmai eina per reaction window
-    startReactionWindow(
-      roomId,
-      socket.id,
-      card,
-      targetId || null,
-      extraData || null,
-    );
+    // 5. Atnaujiname bendrą žaidimo būseną (pvz., kad visi matytų sumažėjusį kortų skaičių rankoje)
+    broadcastGameState(roomId);
   });
 
   // Trap aktyvavimas — TIKTAI ne tą ėjimą kada padėjai (3 punktas)
@@ -1424,8 +1420,8 @@ io.on("connection", (socket) => {
       return socket.emit("error_message", "Jau panaudojai veiksmą!");
     if (game.deck.length === 0)
       return socket.emit("error_message", "Kaladė tuščia!");
-    if (current.cards.length >= HAND_LIMIT)
-      return socket.emit("error_message", `Max ${HAND_LIMIT}!`);
+    // if (current.cards.length >= HAND_LIMIT)
+    //   return socket.emit("error_message", `Max ${HAND_LIMIT}!`);
     const hasBadDraw = (current.curses || []).some(
       (c) => c.effect === "curse_bad_draw",
     );
@@ -1440,11 +1436,11 @@ io.on("connection", (socket) => {
       current.cards.push(card);
       socket.emit("receive_card", card);
     }
-    game.actionUsed = true;
+    // game.actionUsed = true;
     broadcastGameState(roomId);
-    setTimeout(() => {
-      if (games[roomId] && !games[roomId].winner) nextTurn(roomId);
-    }, 700);
+    // setTimeout(() => {
+    //   if (games[roomId] && !games[roomId].winner) nextTurn(roomId);
+    // }, 700);
   });
 
   socket.on("end_turn", (roomId) => {
@@ -1461,38 +1457,102 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("game_restarted");
   });
 
+  socket.on("rejoin_game", ({ roomId, username }) => {
+    const targetUsername = username || socket.data?.username;
+    const game = games[roomId];
+    const room = rooms.find((r) => r.id === roomId);
+
+    if (!game || !targetUsername) {
+      socket.emit("rejoin_failed", {
+        message: "Žaidimas nerastas arba pasibaigė",
+      });
+      return;
+    }
+
+    // Surandame žaidėją žaidime pagal jo username
+    const player = game.players.find((p) => p.username === targetUsername);
+
+    if (player) {
+      // 1. Sustabdome šalinimo laikmatį iš disconnect dalies!
+      if (player.disconnectTimer) {
+        clearTimeout(player.disconnectTimer);
+        player.disconnectTimer = null;
+      }
+
+      // 2. Atnaujiname žaidėjo būseną ir socket duomenis
+      player.isConnected = true;
+      player.id = socket.id; // Priskiriame NAUJĄ socket.id po puslapio perkrovimo (F5)
+      socket.data.username = targetUsername;
+
+      // 3. Prijungiame naują socket'ą prie kambario kanalo
+      socket.join(roomId);
+
+      // 4. Išsiunčiame žaidėjui DABARTINĘ pilną žaidimo būseną
+      socket.emit("game_rejoined", {
+        roomId,
+        game,
+        room,
+      });
+
+      // 5. Pranešame kitiems žaidėjams, kad šis žaidėjas grįžo
+      io.to(roomId).emit("player_reconnected", {
+        username: targetUsername,
+        game,
+      });
+
+      console.log(
+        `Žaidėjas ${targetUsername} sėkmingai grįžo į žaidimą ${roomId}`,
+      );
+    } else {
+      socket.emit("rejoin_failed", {
+        message: "Žaidėjas nerastas žaidimo sąraše",
+      });
+    }
+  });
+
   socket.on("disconnect", () => {
+    const username = socket.data?.username;
+
     Object.keys(games).forEach((roomId) => {
       const game = games[roomId];
-      const player = game.players.find((p) => p.id === socket.id);
-      if (player) {
-        player.isConnected = false;
-        if (player.madMousePending) {
-          player.madMousePending = false;
-          game.madMousePlayerId = null;
+      const player = game.players.find(
+        (p) => p.username === username || p.id === socket.id,
+      );
+
+      if (!player) return;
+
+      player.isConnected = false;
+
+      if (player.disconnectTimer) clearTimeout(player.disconnectTimer);
+
+      player.disconnectTimer = setTimeout(() => {
+        if (!player.isConnected) {
+          const room = rooms.find((r) => r.id === roomId);
+          if (room) {
+            room.players = room.players.filter(
+              (p) => p.username !== player.username,
+            );
+            if (room.players.length === 0) {
+              rooms = rooms.filter((r) => r.id !== roomId);
+            } else if (room.host === player.username) {
+              room.host = room.players[0].username;
+            }
+          }
+
+          if (game) {
+            game.players = game.players.filter(
+              (p) => p.username !== player.username,
+            );
+            if (game.players.length === 0) {
+              delete games[roomId];
+            }
+          }
+
+          io.to(roomId).emit("room_data_update", room);
+          io.emit("update_rooms", rooms);
         }
-        if (game.reactionWindow) {
-          game.reactionWindow.passedPlayers.add(socket.id);
-          if (
-            game.reactionWindow.passedPlayers.size >=
-            game.reactionWindow.totalOthers
-          )
-            finishReactionWindow(roomId);
-        }
-        io.to(roomId).emit("game_notification", {
-          message: `${player.username} atsijungė...`,
-          type: "skip",
-        });
-        broadcastGameState(roomId);
-        if (
-          game.players[game.currentTurnIndex].id === socket.id &&
-          !game.winner
-        )
-          setTimeout(() => nextTurn(roomId), 2000);
-      }
+      }, 60000);
     });
-    handlePlayerExit(socket.id);
-    console.log("Atsijungė:", socket.id);
   });
 });
 

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { socket } from "../services/socket";
 
 export interface CardType {
@@ -46,6 +47,7 @@ interface GameStore {
   mySocketId: string | null;
 
   myCards: CardType[];
+  myTrapZoneCards: CardType[];
   opponents: OpponentInfo[];
   currentTurnPlayerId: string | null;
   deckCount: number;
@@ -104,177 +106,213 @@ function playSound(name: string) {
   } catch {}
 }
 
-export const useGameStore = create<GameStore>((set, get) => {
-  socket.on("game_state_update", (state: any) => {
-    set({
-      myCards: state.myCards || [],
-      opponents: state.opponents || [],
-      currentTurnPlayerId: state.currentTurnPlayerId,
-      deckCount: state.deckCount,
-      discardPile: state.discardPile || [],
-      tableCards: state.tableCards || [],
-      pendingAction: state.pendingAction,
-      winner: state.winner,
-      turnNumber: state.turnNumber || 0,
-      handLimit: state.handLimit || 10,
-      phase: state.phase || "playing",
-      actionUsed: state.actionUsed || false,
-      madMousePlayerId: state.madMousePlayerId || null,
-    });
-  });
+let listenersAttached = false;
 
-  socket.on("game_notification", (data: { message: string; type: string }) => {
-    set({ notification: data });
-    if (data.type === "action") playSound("play");
-    if (data.type === "trap") playSound("trap");
-    if (data.type === "turn") playSound("turn");
-    if (data.type === "mad_mouse") playSound("win");
-    setTimeout(() => set({ notification: null }), 3500);
-  });
+export const useGameStore = create<GameStore>()(
+  persist(
+    (set, get) => ({
+      roomId: null,
+      mySocketId: null,
+      myCards: [],
+      myTrapZoneCards: [],
+      opponents: [],
+      currentTurnPlayerId: null,
+      deckCount: 0,
+      discardPile: [],
+      tableCards: [],
+      pendingAction: null,
+      winner: null,
+      turnNumber: 0,
+      handLimit: 100000,
+      phase: "playing",
+      actionUsed: false,
+      madMousePlayerId: null,
+      reactionWindow: null,
+      notification: null,
+      inspectResult: null,
+      inspectStealResult: null,
+      actionNeedsTarget: null,
 
-  socket.on("receive_card", () => {
-    playSound("draw");
-  });
-  socket.on("starting_cards", () => {
-    playSound("draw");
-  });
+      initGame: (roomId: string) => {
+        const currentSocketId = socket.id || get().mySocketId;
+        set({ roomId, mySocketId: currentSocketId });
 
-  socket.on("inspect_result", (data: any) => {
-    set({ inspectResult: data });
-  });
-  socket.on("inspect_steal_choose", (data: any) => {
-    set({ inspectStealResult: data });
-  });
-  socket.on("action_needs_target", (data: any) => {
-    set({ actionNeedsTarget: data });
-  });
-  socket.on("game_over", (data: { winner: string }) => {
-    set({ winner: data.winner });
-    playSound("win");
-  });
-  socket.on("game_restarted", () => {
-    const { roomId } = get();
-    if (roomId) window.location.href = `/room/${roomId}`;
-  });
-  socket.on("error_message", (msg: string) => {
-    alert(msg);
-  });
+        const username = (() => {
+          try {
+            return (
+              JSON.parse(localStorage.getItem("auth-storage") || "{}").state
+                ?.username || ""
+            );
+          } catch {
+            return "";
+          }
+        })();
 
-  socket.on("reaction_window_start", (data: any) => {
-    set({ reactionWindow: { ...data, startedAt: Date.now() } });
-  });
+        // Prijungiame Socket.io klausytojus vieną kartą
+        if (!listenersAttached) {
+          listenersAttached = true;
 
-  socket.on("reaction_window_end", () => {
-    set({ reactionWindow: null });
-  });
+          socket.on("connect", () => {
+            set({ mySocketId: socket.id });
+            if (roomId) {
+              socket.emit("join_game_room", { roomId, username });
+            }
+          });
 
-  return {
-    roomId: null,
-    mySocketId: null,
-    myCards: [],
-    opponents: [],
-    currentTurnPlayerId: null,
-    deckCount: 0,
-    discardPile: [],
-    tableCards: [],
-    pendingAction: null,
-    winner: null,
-    turnNumber: 0,
-    handLimit: 10,
-    phase: "playing",
-    actionUsed: false,
-    madMousePlayerId: null,
-    reactionWindow: null,
-    notification: null,
-    inspectResult: null,
-    inspectStealResult: null,
-    actionNeedsTarget: null,
+          socket.on("game_state_update", (state: any) => {
+            set({
+              myCards: state.myCards || [],
+              myTrapZoneCards: state.myTrapZoneCards || [],
+              opponents: state.opponents || [],
+              currentTurnPlayerId: state.currentTurnPlayerId,
+              deckCount: state.deckCount,
+              discardPile: state.discardPile || [],
+              tableCards: state.tableCards || [],
+              pendingAction: state.pendingAction,
+              winner: state.winner,
+              turnNumber: state.turnNumber || 0,
+              handLimit: state.handLimit || 100000,
+              phase: state.phase || "playing",
+              actionUsed: state.actionUsed || false,
+              madMousePlayerId: state.madMousePlayerId || null,
+            });
+          });
 
-    initGame: (roomId: string) => {
-      set({ roomId, mySocketId: socket.id });
-      const username = (() => {
-        try {
-          return (
-            JSON.parse(localStorage.getItem("auth-storage") || "{}").state
-              ?.username || ""
+          socket.on(
+            "game_notification",
+            (data: { message: string; type: string }) => {
+              set({ notification: data });
+              if (data.type === "action") playSound("play");
+              if (data.type === "trap") playSound("trap");
+              if (data.type === "turn") playSound("turn");
+              if (data.type === "mad_mouse") playSound("win");
+              setTimeout(() => set({ notification: null }), 3500);
+            },
           );
-        } catch {
-          return "";
+
+          socket.on("receive_card", () => playSound("draw"));
+          socket.on("starting_cards", () => playSound("draw"));
+
+          socket.on("inspect_result", (data: any) =>
+            set({ inspectResult: data }),
+          );
+          socket.on("inspect_steal_choose", (data: any) =>
+            set({ inspectStealResult: data }),
+          );
+          socket.on("action_needs_target", (data: any) =>
+            set({ actionNeedsTarget: data }),
+          );
+
+          socket.on("game_over", (data: { winner: string }) => {
+            set({ winner: data.winner });
+            playSound("win");
+          });
+
+          socket.on("game_restarted", () => {
+            const currentRoomId = get().roomId;
+            if (currentRoomId) window.location.href = `/room/${currentRoomId}`;
+          });
+
+          socket.on("error_message", (msg: string) => {
+            alert(msg);
+          });
+
+          socket.on("reaction_window_start", (data: any) => {
+            set({ reactionWindow: { ...data, startedAt: Date.now() } });
+          });
+
+          socket.on("reaction_window_end", () => {
+            set({ reactionWindow: null });
+          });
         }
-      })();
-      socket.emit("join_game_room", { roomId, username });
-    },
 
-    playCard: (cardInstanceId, targetId, extraData) => {
-      const { roomId } = get();
-      if (roomId)
-        socket.emit("play_card", {
-          roomId,
-          cardInstanceId,
-          targetId,
-          extraData,
-        });
-    },
+        // Išsiunčiame prisijungimą/rejoin į kambarį
+        socket.emit("join_game_room", { roomId, username });
+      },
 
-    selectTarget: (targetId, extraData) => {
-      const { roomId } = get();
-      if (roomId) {
-        socket.emit("select_target", { roomId, targetId, extraData });
-        set({ actionNeedsTarget: null });
-      }
-    },
+      playCard: (cardInstanceId, targetId, extraData) => {
+        const { roomId } = get();
+        if (roomId)
+          socket.emit("play_card", {
+            roomId,
+            cardInstanceId,
+            targetId,
+            extraData,
+          });
+      },
 
-    activateTrap: (tableCardId, targetId) => {
-      const { roomId } = get();
-      if (roomId)
-        socket.emit("activate_trap", { roomId, tableCardId, targetId });
-    },
+      selectTarget: (targetId, extraData) => {
+        const { roomId } = get();
+        if (roomId) {
+          socket.emit("select_target", { roomId, targetId, extraData });
+          set({ actionNeedsTarget: null });
+        }
+      },
 
-    inspectStealPick: (targetId, cardInstanceId) => {
-      const { roomId } = get();
-      if (roomId) {
-        socket.emit("inspect_steal_pick", { roomId, targetId, cardInstanceId });
-        set({ inspectStealResult: null });
-      }
-    },
+      activateTrap: (tableCardId, targetId) => {
+        const { roomId } = get();
+        if (roomId)
+          socket.emit("activate_trap", { roomId, tableCardId, targetId });
+      },
 
-    drawCard: () => {
-      const { roomId } = get();
-      if (roomId) socket.emit("draw_card", roomId);
-    },
-    endTurn: () => {
-      const { roomId } = get();
-      if (roomId) socket.emit("end_turn", roomId);
-    },
-    declareMadMouse: () => {
-      const { roomId } = get();
-      if (roomId) socket.emit("declare_mad_mouse", roomId);
-    },
-    mulligan: () => {
-      const { roomId } = get();
-      if (roomId) socket.emit("mulligan", roomId);
-    },
-    restartGame: () => {
-      const { roomId } = get();
-      if (roomId) socket.emit("restart_game", roomId);
-    },
+      inspectStealPick: (targetId, cardInstanceId) => {
+        const { roomId } = get();
+        if (roomId) {
+          socket.emit("inspect_steal_pick", {
+            roomId,
+            targetId,
+            cardInstanceId,
+          });
+          set({ inspectStealResult: null });
+        }
+      },
 
-    passReaction: () => {
-      const { roomId } = get();
-      if (roomId) socket.emit("pass_reaction", roomId);
-      set({ reactionWindow: null });
+      drawCard: () => {
+        const { roomId } = get();
+        if (roomId) socket.emit("draw_card", roomId);
+      },
+      endTurn: () => {
+        const { roomId } = get();
+        if (roomId) socket.emit("end_turn", roomId);
+      },
+      declareMadMouse: () => {
+        const { roomId } = get();
+        if (roomId) socket.emit("declare_mad_mouse", roomId);
+      },
+      mulligan: () => {
+        const { roomId } = get();
+        if (roomId) socket.emit("mulligan", roomId);
+      },
+      restartGame: () => {
+        const { roomId } = get();
+        if (roomId) socket.emit("restart_game", roomId);
+      },
+
+      passReaction: () => {
+        const { roomId } = get();
+        if (roomId) socket.emit("pass_reaction", roomId);
+        set({ reactionWindow: null });
+      },
+      activateTrapReaction: (tableCardId, targetId) => {
+        const { roomId } = get();
+        if (roomId)
+          socket.emit("activate_trap_reaction", {
+            roomId,
+            tableCardId,
+            targetId,
+          });
+      },
+      clearInspect: () => set({ inspectResult: null }),
+      clearInspectSteal: () => set({ inspectStealResult: null }),
+      clearActionNeedsTarget: () => set({ actionNeedsTarget: null }),
+    }),
+    {
+      name: "game-board-storage", // Būsenos raktas naršyklėje
+      storage: createJSONStorage(() => sessionStorage), // Naudojama sessionStorage, kad uždarius kortelę būsena nusinulintų, bet perėjus puslapius išliktų
+      partialize: (state) => ({
+        roomId: state.roomId,
+        mySocketId: state.mySocketId,
+      }),
     },
-    activateTrapReaction: (tableCardId, targetId) => {
-      const { roomId } = get();
-      if (roomId)
-        socket.emit("activate_trap_reaction", {
-          roomId,
-          tableCardId,
-          targetId,
-        });
-    },
-    clearInspect: () => set({ inspectResult: null }),
-    clearInspectSteal: () => set({ inspectStealResult: null }),
-    clearActionNeedsTarget: () => set({ actionNeedsTarget: null }),
-  };
-});
+  ),
+);

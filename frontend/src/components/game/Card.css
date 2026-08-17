@@ -11,6 +11,13 @@
   flex-shrink: 0;
   box-sizing: border-box;
 }
+.overlay .card {
+  width: clamp(80px, 20vw, 166px);
+  height: clamp(120px, 50vw, 240px);
+}
+.overlay .carad-menu {
+  padding: 30px;
+}
 
 /* ─── LIGHT / CREAM STYLE ─────────────────────────────────────────────────── */
 .card--light {
@@ -134,6 +141,7 @@
   z-index: 2;
   flex: 1;
   overflow-y: hidden;
+  overflow-x: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
@@ -172,10 +180,10 @@
   font-size: 0.8rem;
 }
 .card--compact .card-desc-light {
-  display: none;
+  /* display: none; */
 }
 .card--compact .card-bottom-ornament {
-  display: none;
+  /* display: none; */
 }
 .card--compact .card-corner {
   width: 8px;
@@ -217,4 +225,46 @@
   color: #4c1d95;
   opacity: 0.4;
   z-index: 1;
+}
+
+/* ─── COMPACT VERSIJA ───────────────────────────── */
+
+.card--compact {
+  width: clamp(156px, 39vw, 204px);
+  height: clamp(234px, 58.5vw, 306px);
+  padding: 12px;
+  border-radius: 24px;
+}
+
+/* Pavadinimas */
+.card--compact .card-title-light {
+  font-size: clamp(0.75rem, 2.6vw, 1.14rem);
+}
+
+/* Art apskritimas – 3x */
+.card--compact .card-art-circle {
+  width: clamp(72px, 25.5vw, 100px);
+  height: clamp(72px, 25.5vw, 100px);
+  border-width: 4px;
+}
+
+/* Emoji – 3x */
+.card--compact .card-art-emoji {
+  font-size: clamp(2.4rem, 7.5vw, 4.2rem);
+}
+
+/* Kampų ornamentai – 3x */
+.card--compact .card-corner {
+  width: 24px;
+  height: 24px;
+}
+
+/* Apatinis ornamentas */
+.card--compact .card-bottom-ornament {
+  font-size: 1.8rem;
+}
+
+/* Aprašymas */
+.card--compact .card-desc-light {
+  font-size: clamp(0.8rem, 3vw, 1rem);
 }

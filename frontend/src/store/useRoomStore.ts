@@ -30,8 +30,8 @@ export const useRoomStore = create<RoomState>()(
       isAdmin: false,
 
       setRoomData: (data, currentUser) => {
-        console.log("--- setRoomData buvo iškviestas su duomenimis:", data);
-        console.trace("Kvietimo kilmė:");
+        // console.log("--- setRoomData buvo iškviestas su duomenimis:", data);
+        // console.trace("Kvietimo kilmė:");
         set(
           {
             roomId: data.id || data.roomId,

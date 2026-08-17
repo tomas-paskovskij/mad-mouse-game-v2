@@ -1,0 +1,58 @@
+/* Išorinis konteineris (Scroll juosta) */
+.hand-carousel-container {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: auto !important; /* Priverstinis horizontalus scroll */
+  overflow-y: hidden; /* Neleidžia atsirasti vertikaliam scrollbar */
+  box-sizing: border-box;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Vidinis takelis (Išplečia plotį pagal kortas, kad įsijungtų scroll) */
+.hand-cards-track {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important; /* Uždraudžia kortoms peršokti į kitą eilutę */
+  width: max-content; /* BŪTINA: išplečia konteinerį pagal kortų kiekį */
+  padding: 35px 20px 10px 20px; /* Vietos viršuje pakeltai kortai */
+}
+
+/* Vienos kortos elementas */
+.hand-card-item {
+  flex: 0 0 auto !important; /* BŪTINA: uždraudžia naršyklei suspausti kortas */
+  margin-left: -20px; /* Kortų užklojimo (overlapping) tarpas */
+  user-select: none;
+  cursor: pointer;
+}
+
+.hand-card-item:first-child {
+  margin-left: 0;
+}
+
+/* Švelni scrollbar juosta */
+.hand-carousel-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.hand-carousel-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hand-carousel-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.hand-carousel-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Pranešimas kai nėra kortų */
+.hand-cards-empty {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  text-align: center;
+  width: 100%;
+  padding: 20px 0;
+}
