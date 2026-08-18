@@ -22,7 +22,7 @@ const games = {};
 const HAND_LIMIT = 100000;
 const WIN_CONDITION = 10;
 const STARTING_CARDS = 3;
-const REACTION_MS = 55000;
+const REACTION_MS = 22255000;
 
 const handlePlayerExit = (socketId, roomId = null) => {
   rooms.forEach((room) => {
@@ -908,7 +908,7 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
       break;
     }
     default:
-      console.log("Nežinomas efektas:", card.effect);
+    // console.log("Nežinomas efektas:", card.effect);
   }
   broadcastGameState(roomId);
 }
@@ -1229,7 +1229,7 @@ io.on("connection", (socket) => {
         type: "trap",
       });
 
-      console.log("player------", player);
+      // console.log("player------", player);
       player.cards.splice(cardIdx, 1);
       broadcastGameState(roomId);
       return;
@@ -1254,41 +1254,19 @@ io.on("connection", (socket) => {
 
   // Trap aktyvavimas — TIKTAI ne tą ėjimą kada padėjai (3 punktas)
   socket.on("activate_trap", (data) => {
+    console.log("activate_trap", data);
     const { roomId, tableCardId, targetId } = data;
     const game = games[roomId];
     if (!game || game.winner) return;
-    if (game.players[game.currentTurnIndex].id !== socket.id)
-      return socket.emit("error_message", "Ne tavo ėjimas!");
-    if (game.actionUsed)
-      return socket.emit("error_message", "Jau panaudojai veiksmą!");
+
     const tc = (game.tableCards || []).find(
       (t) => t.id === tableCardId && t.ownerId === socket.id,
     );
     if (!tc) return;
-    // Negalima aktyvuoti tą patį ėjimą kada padėjai (3 punktas)
-    if (tc.placedAtTurn === game.turnNumber)
-      return socket.emit("error_message", "Negalima aktyvuoti tą patį ėjimą!");
+
     game.tableCards = game.tableCards.filter((t) => t.id !== tableCardId);
     const player = game.players.find((p) => p.id === socket.id);
-    if (tc.card.effect === "trap_lose_card" && targetId) {
-      const target = game.players.find((p) => p.id === targetId);
-      if (target && target.cards.length > 0) {
-        game.discardPile.push(
-          makeEntry(
-            target.cards.splice(
-              Math.floor(Math.random() * target.cards.length),
-              1,
-            )[0],
-            target.username,
-          ),
-        );
-        checkMadMouseAfter(roomId);
-        io.to(roomId).emit("game_notification", {
-          message: `🪤 ${player.username} aktyvavo! ${target.username} praranda kortą!`,
-          type: "trap",
-        });
-      }
-    }
+
     const pl = game.players.find((p) => p.id === socket.id);
     if (pl)
       io.to(roomId).emit("card_played_display", {
@@ -1298,11 +1276,12 @@ io.on("connection", (socket) => {
       });
     game.actionUsed = true;
     broadcastGameState(roomId);
-    startReactionWindow(roomId, socket.id, null, null, null, true);
+    // startReactionWindow(roomId, socket.id, null, null, null, true);
   });
 
   // Trap aktyvavimas per reaction window
   socket.on("activate_trap_reaction", (data) => {
+    console.log("activate_trap_reaction", data);
     const { roomId, tableCardId, targetId } = data;
     const game = games[roomId];
     if (!game) return;

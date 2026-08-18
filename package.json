@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "concurrently -n \"FRONT,BACK\" -c \"bgGreen.bold,bgMagenta.bold\" \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
-    "install-all": "cd frontend && npm install && cd ../backend && npm install"
+    "install-all": "cd frontend && npm install && cd ../backend && npm install",
+    "check:frontend": "npm --prefix frontend run tsc -- --noEmit",
+    "check:backend": "npm --prefix backend run tsc -- --noEmit",
+    "check:all": "npm run check:frontend && npm run check:backend"
   },
   "keywords": [],
   "author": "",
