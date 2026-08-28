@@ -5,7 +5,7 @@ const getSocketUrl = () => {
   if (typeof window !== "undefined") {
     return window.location.hostname === "localhost"
       ? "http://localhost:3000"
-      : "https://5b1spzmn-3000.euw.devtunnels.ms";
+      : "https://snqgf33x-3000.euw.devtunnels.ms";
   }
   return "http://localhost:3000";
 };

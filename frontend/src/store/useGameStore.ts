@@ -5,7 +5,7 @@ import { socket } from "../services/socket";
 export interface CardType {
   instanceId: string;
   id: string;
-  type: "action" | "trap" | "response" | "curse";
+  type: "action" | "trap" | "response" | "curse" | "interrupt" | "goal";
   title: string;
   description: string;
   effect: string;
@@ -16,25 +16,47 @@ export interface CardType {
   duration?: number;
   count?: number;
   hidden?: boolean;
+  time?: string;
+  ownerUsername?: string;
 }
 
 export interface TableCard {
   id: string;
   card: CardType;
   ownerId: string;
-  ownerName: string;
-  placedAt: number;
-  turnsLeft: number | null;
+  ownerName?: string;
+  placedAt?: number;
+  placedAtTurn?: number;
+  turnsLeft?: number | null;
   canActivate?: boolean;
 }
 
-export interface OpponentInfo {
+export interface Player {
   id: string;
   username: string;
+  name?: string;
   cardCount: number;
-  curses: any[];
-  isConnected: boolean;
-  madMousePending: boolean;
+  cards?: CardType[];
+  curses?: any[];
+  isConnected?: boolean;
+  madMousePending?: boolean;
+}
+
+export interface OpponentInfo extends Player {}
+
+export interface HistoryEntry {
+  id: number;
+  msg: string;
+  type: string;
+  time: string;
+}
+
+export interface ChainEntry {
+  id: number;
+  card: CardType;
+  playerName: string;
+  playerId: string;
+  isTrap?: boolean;
 }
 
 interface PendingAction {
@@ -46,9 +68,18 @@ interface GameStore {
   roomId: string | null;
   mySocketId: string | null;
 
+  // Grandinės ir stadijų būsenos
+  chain: ChainEntry[];
+  stageActive: boolean;
+  stageIdx: number;
+  stageTimer: ReturnType<typeof setTimeout> | null;
+
   myCards: CardType[];
   myTrapZoneCards: CardType[];
-  opponents: OpponentInfo[];
+  opponents: Player[];
+  players: Player[]; // Alias dėl suderinamumo su UI
+  handCards: CardType[]; // Alias dėl suderinamumo su UI
+
   currentTurnPlayerId: string | null;
   deckCount: number;
   discardPile: CardType[];
@@ -60,6 +91,18 @@ interface GameStore {
   phase: string;
   actionUsed: boolean;
   madMousePlayerId: string | null;
+
+  // UI ir Istorijos būsenos
+  selectedCard: CardType | null;
+  showDiscard: boolean;
+  showHistory: boolean;
+  history: HistoryEntry[];
+  reactionSecs: number;
+  elapsedSeconds: number;
+  canDeclare: boolean;
+  trapActivating: TableCard | null;
+  stealTargetPlayer: Player | null;
+
   reactionWindow: {
     initiatorId: string;
     card: any;
@@ -77,6 +120,18 @@ interface GameStore {
   } | null;
   actionNeedsTarget: { card: CardType; initiatorId: string } | null;
 
+  // Chain Actions
+  addChainEntry: (data: {
+    card: CardType;
+    playerName: string;
+    playerId: string;
+    isTrap?: boolean;
+  }) => void;
+  scheduleNextChainStage: (idx: number) => void;
+  stageDone: () => void;
+  clearChain: () => void;
+
+  // Game Actions
   initGame: (roomId: string) => void;
   playCard: (
     cardInstanceId: string,
@@ -96,6 +151,21 @@ interface GameStore {
   clearActionNeedsTarget: () => void;
   passReaction: () => void;
   activateTrapReaction: (tableCardId: string, targetId?: string) => void;
+
+  // UI Actions
+  setSelectedCard: (card: CardType | null) => void;
+  setShowDiscard: (show: boolean) => void;
+  setShowHistory: (show: boolean) => void;
+  toggleHistory: (show?: boolean) => void;
+  addHistoryEntry: (entry: HistoryEntry) => void;
+  setTrapActivating: (trap: TableCard | null) => void;
+  setStealTargetPlayer: (player: Player | null) => void;
+  stealCardFromPlayer: (
+    targetPlayerId: string,
+    cardInstanceId?: string,
+    source?: "hand" | "table",
+  ) => void;
+  giveCardToPlayer: (targetPlayerId: string, cardInstanceId: string) => void;
 }
 
 function playSound(name: string) {
@@ -107,22 +177,33 @@ function playSound(name: string) {
 }
 
 let listenersAttached = false;
+let timerInterval: ReturnType<typeof setInterval> | null = null;
 
 export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
+      // PRADINĖS BŪSENOS
       roomId: null,
       mySocketId: null,
+
+      // Chain būsena
+      chain: [],
+      stageActive: false,
+      stageIdx: 0,
+      stageTimer: null,
+
       myCards: [],
       myTrapZoneCards: [],
       opponents: [],
+      players: [],
+      handCards: [],
       currentTurnPlayerId: null,
       deckCount: 0,
       discardPile: [],
       tableCards: [],
       pendingAction: null,
       winner: null,
-      turnNumber: 0,
+      turnNumber: 1,
       handLimit: 100000,
       phase: "playing",
       actionUsed: false,
@@ -133,9 +214,79 @@ export const useGameStore = create<GameStore>()(
       inspectStealResult: null,
       actionNeedsTarget: null,
 
+      // UI ir Istorija
+      selectedCard: null,
+      showDiscard: false,
+      showHistory: false,
+      history: [],
+      reactionSecs: 0,
+      elapsedSeconds: 0,
+      canDeclare: false,
+      trapActivating: null,
+      stealTargetPlayer: null,
+
+      // --- CHAIN VEIKSMŲ LOGIKA ---
+      addChainEntry: (data) => {
+        const entry: ChainEntry = { id: Date.now(), ...data };
+        const currentChain = get().chain;
+        const nextChain = [...currentChain, entry];
+
+        set({ chain: nextChain });
+
+        if (!get().stageActive) {
+          const newIdx = nextChain.length - 1;
+          set({ stageActive: true, stageIdx: newIdx });
+          get().scheduleNextChainStage(newIdx);
+        }
+      },
+
+      scheduleNextChainStage: (idx: number) => {
+        const { stageTimer } = get();
+        if (stageTimer) clearTimeout(stageTimer);
+
+        const timer = setTimeout(() => {
+          const { chain } = get();
+          if (idx + 1 < chain.length) {
+            const nextIdx = idx + 1;
+            set({ stageIdx: nextIdx });
+            get().scheduleNextChainStage(nextIdx);
+          } else {
+            set({ stageActive: false });
+          }
+        }, 5000);
+
+        set({ stageTimer: timer });
+      },
+
+      stageDone: () => {
+        const { stageTimer, chain, stageIdx } = get();
+        if (stageTimer) clearTimeout(stageTimer);
+
+        const nextIdx = stageIdx + 1;
+        if (nextIdx < chain.length) {
+          set({ stageIdx: nextIdx });
+          get().scheduleNextChainStage(nextIdx);
+        } else {
+          set({ stageActive: false });
+        }
+      },
+
+      clearChain: () => {
+        const { stageTimer } = get();
+        if (stageTimer) clearTimeout(stageTimer);
+        set({ chain: [], stageActive: false, stageIdx: 0, stageTimer: null });
+      },
+
+      // --- INIT GAME & SOCKETS ---
       initGame: (roomId: string) => {
         const currentSocketId = socket.id || get().mySocketId;
         set({ roomId, mySocketId: currentSocketId });
+
+        if (!timerInterval) {
+          timerInterval = setInterval(() => {
+            set((s) => ({ elapsedSeconds: s.elapsedSeconds + 1 }));
+          }, 1000);
+        }
 
         const username = (() => {
           try {
@@ -148,7 +299,6 @@ export const useGameStore = create<GameStore>()(
           }
         })();
 
-        // Prijungiame Socket.io klausytojus vieną kartą
         if (!listenersAttached) {
           listenersAttached = true;
 
@@ -160,32 +310,74 @@ export const useGameStore = create<GameStore>()(
           });
 
           socket.on("game_state_update", (state: any) => {
-            set({
-              myCards: state.myCards || [],
-              myTrapZoneCards: state.myTrapZoneCards || [],
-              opponents: state.opponents || [],
-              currentTurnPlayerId: state.currentTurnPlayerId,
-              deckCount: state.deckCount,
-              discardPile: state.discardPile || [],
-              tableCards: state.tableCards || [],
-              pendingAction: state.pendingAction,
-              winner: state.winner,
-              turnNumber: state.turnNumber || 0,
-              handLimit: state.handLimit || 100000,
-              phase: state.phase || "playing",
-              actionUsed: state.actionUsed || false,
-              madMousePlayerId: state.madMousePlayerId || null,
-            });
+            const myCards = state.myCards ?? [];
+            const opponents = state.opponents ?? [];
+            const players = state.players ?? opponents;
+
+            set((s) => ({
+              chain: state.chain ?? s.chain,
+              stageActive: state.stageActive ?? s.stageActive,
+              stageIdx: state.stageIdx ?? s.stageIdx,
+              myCards,
+              handCards: myCards,
+              myTrapZoneCards: state.myTrapZoneCards ?? [],
+              opponents,
+              players,
+              currentTurnPlayerId: state.currentTurnPlayerId ?? null,
+              deckCount: state.deckCount ?? 0,
+              discardPile: state.discardPile ?? [],
+              tableCards: state.tableCards ?? [],
+              pendingAction: state.pendingAction ?? null,
+              winner: state.winner ?? null,
+              turnNumber: state.turnNumber ?? 1,
+              handLimit: state.handLimit ?? 100000,
+              phase: state.phase ?? "playing",
+              actionUsed: state.actionUsed ?? false,
+              madMousePlayerId: state.madMousePlayerId ?? null,
+              canDeclare: state.canDeclare ?? false,
+              elapsedSeconds:
+                typeof state.elapsedSeconds === "number"
+                  ? state.elapsedSeconds
+                  : s.elapsedSeconds,
+            }));
+          });
+
+          // Chain Socket įvykiai
+          socket.on("card_played_display", (data: any) => {
+            get().addChainEntry(data);
+          });
+
+          socket.on("turn_chain_clear", () => {
+            get().clearChain();
           });
 
           socket.on(
             "game_notification",
             (data: { message: string; type: string }) => {
-              set({ notification: data });
+              const time = new Date().toLocaleTimeString("lt-LT", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              });
+
+              set((state) => ({
+                notification: data,
+                history: [
+                  ...state.history.slice(-49),
+                  {
+                    id: Date.now(),
+                    msg: data.message,
+                    type: data.type,
+                    time,
+                  },
+                ],
+              }));
+
               if (data.type === "action") playSound("play");
               if (data.type === "trap") playSound("trap");
               if (data.type === "turn") playSound("turn");
               if (data.type === "mad_mouse") playSound("win");
+
               setTimeout(() => set({ notification: null }), 3500);
             },
           );
@@ -218,18 +410,21 @@ export const useGameStore = create<GameStore>()(
           });
 
           socket.on("reaction_window_start", (data: any) => {
-            set({ reactionWindow: { ...data, startedAt: Date.now() } });
+            set({
+              reactionWindow: { ...data, startedAt: Date.now() },
+              reactionSecs: Math.ceil((data.durationMs || 3000) / 1000),
+            });
           });
 
           socket.on("reaction_window_end", () => {
-            set({ reactionWindow: null });
+            set({ reactionWindow: null, reactionSecs: 0 });
           });
         }
 
-        // Išsiunčiame prisijungimą/rejoin į kambarį
         socket.emit("join_game_room", { roomId, username });
       },
 
+      // --- GAME EMITS ---
       playCard: (cardInstanceId, targetId, extraData) => {
         const { roomId } = get();
         if (roomId)
@@ -239,6 +434,7 @@ export const useGameStore = create<GameStore>()(
             targetId,
             extraData,
           });
+        set({ selectedCard: null });
       },
 
       selectTarget: (targetId, extraData) => {
@@ -305,13 +501,58 @@ export const useGameStore = create<GameStore>()(
       clearInspect: () => set({ inspectResult: null }),
       clearInspectSteal: () => set({ inspectStealResult: null }),
       clearActionNeedsTarget: () => set({ actionNeedsTarget: null }),
+
+      // UI SETTERS
+      setSelectedCard: (card) => set({ selectedCard: card }),
+      setShowDiscard: (show) => set({ showDiscard: show }),
+      setShowHistory: (show) => set({ showHistory: show }),
+      toggleHistory: (show) =>
+        set((s) => ({ showHistory: show ?? !s.showHistory })),
+      addHistoryEntry: (entry) =>
+        set((s) => ({ history: [...s.history.slice(-49), entry] })),
+      setTrapActivating: (trap) => set({ trapActivating: trap }),
+      setStealTargetPlayer: (player) => set({ stealTargetPlayer: player }),
+      // 1. PAIMTI / ATIMTI KORTĄ (Steal / Take)
+      stealCardFromPlayer: (
+        targetPlayerId,
+        cardInstanceId,
+        source = "hand",
+      ) => {
+        const { roomId } = get();
+        if (roomId) {
+          socket.emit("steal_card", {
+            roomId,
+            targetPlayerId,
+            cardInstanceId, // Jei nurodoma konkreti korta (pvz. nuo stalo), arba undefined (jei atsitiktinė iš rankos)
+            source, // "hand" arba "table"
+          });
+        }
+        // set({ stealTargetPlayer: null }); // Uždaro UI modalą
+      },
+
+      // 2. DUOTI KORTĄ (Give / Transfer)
+      giveCardToPlayer: (targetPlayerId, cardInstanceId) => {
+        const { roomId } = get();
+        if (roomId) {
+          socket.emit("give_card", {
+            roomId,
+            targetPlayerId,
+            cardInstanceId, // Korta iš mano `myCards`, kurią noriu atiduoti
+          });
+        }
+      },
     }),
     {
-      name: "game-board-storage", // Būsenos raktas naršyklėje
-      storage: createJSONStorage(() => sessionStorage), // Naudojama sessionStorage, kad uždarius kortelę būsena nusinulintų, bet perėjus puslapius išliktų
+      name: "game-board-storage",
+      version: 1,
+      storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         roomId: state.roomId,
         mySocketId: state.mySocketId,
+      }),
+      merge: (persistedState: any, currentState) => ({
+        ...currentState,
+        ...persistedState,
       }),
     },
   ),

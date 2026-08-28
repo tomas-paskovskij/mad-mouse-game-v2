@@ -143,7 +143,7 @@
   overflow-y: hidden;
   overflow-x: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 4;
+  /* -webkit-line-clamp: 4; */
   -webkit-box-orient: vertical;
   font-family: Georgia, serif;
   font-style: italic;
@@ -268,3 +268,69 @@
 .card--compact .card-desc-light {
   font-size: clamp(0.8rem, 3vw, 1rem);
 }
+
+/* ─── 3D CONTAINER IR NUGARĖLĖS STILIAI ──────────────────────────────────── */
+.card--back {
+  display: none;
+}
+/*
+.card-wrapper {
+  width: clamp(80px, 20vw, 110px);
+  height: clamp(120px, 50vw, 165px);
+  perspective: 1000px;
+  display: inline-block;
+  user-select: none;
+}
+
+.overlay .card-wrapper {
+  width: clamp(80px, 20vw, 166px);
+  height: clamp(120px, 50vw, 240px);
+}
+
+.card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+
+.card-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.card-wrapper .card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+
+.card--back {
+  transform: rotateY(180deg);
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.card-back-inner-border {
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+  border: 1.5px dashed rgba(167, 139, 250, 0.4);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+
+.card-wrapper--compact {
+  width: clamp(52px, 13vw, 68px);
+  height: clamp(78px, 19.5vw, 102px);
+}
+*/

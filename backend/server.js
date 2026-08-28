@@ -83,6 +83,10 @@ function broadcastGameState(roomId) {
         id: p.id,
         username: p.username,
         cardCount: p.cards.length,
+        cards: (p.cards || []).map((c) => ({
+          instanceId: c.instanceId,
+          hidden: true, // Paslepiame pavadinimą, tipą ir kitus duomenis
+        })),
         curses: p.curses || [],
         isConnected: p.isConnected !== false,
         madMousePending: p.madMousePending || false,
@@ -1420,6 +1424,104 @@ io.on("connection", (socket) => {
     // setTimeout(() => {
     //   if (games[roomId] && !games[roomId].winner) nextTurn(roomId);
     // }, 700);
+  });
+
+  socket.on(
+    "steal_card",
+    ({ roomId, targetPlayerId, cardInstanceId, source }) => {
+      const game = games[roomId];
+      if (!game || game.winner) return;
+
+      const attacker = game.players.find((p) => p.id === socket.id);
+      const victim = game.players.find((p) => p.id === targetPlayerId);
+
+      if (!attacker || !victim) return;
+
+      // Tikriname, ar užpuolikas neviršija kortų ribos
+      if (attacker.cards.length >= HAND_LIMIT) {
+        return socket.emit(
+          "error_message",
+          "Pasiektas maksimalus kortų limitas!",
+        );
+      }
+
+      let stolenCard = null;
+
+      if (source === "hand" && victim.cards.length > 0) {
+        // Jei paimama konkreti arba atsitiktinė korta iš rankos:
+        const cardIndex = cardInstanceId
+          ? victim.cards.findIndex((c) => c.instanceId === cardInstanceId)
+          : Math.floor(Math.random() * victim.cards.length);
+
+        const indexToUse = cardIndex !== -1 ? cardIndex : 0;
+        stolenCard = victim.cards.splice(indexToUse, 1)[0];
+      } else if (source === "table" && game.tableCards) {
+        // Jei paimama korta nuo stalo:
+        const tableIdx = game.tableCards.findIndex(
+          (tc) =>
+            tc.ownerId === victim.id && tc.card.instanceId === cardInstanceId,
+        );
+        if (tableIdx !== -1) {
+          const [removed] = game.tableCards.splice(tableIdx, 1);
+          stolenCard = removed.card;
+        }
+      }
+
+      if (stolenCard) {
+        stolenCard.hidden = false;
+        attacker.cards.push(stolenCard);
+
+        // Patikriname Mad Mouse būsenas ir išsiunčiame pranešimą
+        checkMadMouseAfter(roomId);
+
+        io.to(roomId).emit("game_notification", {
+          message: `🗡 ${attacker.username} pavogė kortą iš ${victim.username}!`,
+          type: "action",
+        });
+
+        // Atnaujiname žaidimo būseną visiems kambario žaidėjams
+        broadcastGameState(roomId);
+      }
+    },
+  );
+
+  // --- 2. DUOTI KORTĄ (give_card) ---
+  socket.on("give_card", ({ roomId, targetPlayerId, cardInstanceId }) => {
+    const game = games[roomId];
+    if (!game || game.winner) return;
+
+    const giver = game.players.find((p) => p.id === socket.id);
+    const receiver = game.players.find((p) => p.id === targetPlayerId);
+
+    if (!giver || !receiver) return;
+
+    // Tikriname, ar gavėjas gali priimti kortą
+    if (receiver.cards.length >= HAND_LIMIT) {
+      return socket.emit(
+        "error_message",
+        `${receiver.username} turi per daug kortų!`,
+      );
+    }
+
+    const cardIndex = giver.cards.findIndex(
+      (c) => c.instanceId === cardInstanceId,
+    );
+
+    if (cardIndex !== -1) {
+      const [givenCard] = giver.cards.splice(cardIndex, 1);
+      receiver.cards.push(givenCard);
+
+      // Patikriname Mad Mouse būsenas
+      checkMadMouseAfter(roomId);
+
+      io.to(roomId).emit("game_notification", {
+        message: `🎁 ${giver.username} davė kortą ${receiver.username}!`,
+        type: "action",
+      });
+
+      // Atnaujiname žaidimo būseną visiems kambario žaidėjams
+      broadcastGameState(roomId);
+    }
   });
 
   socket.on("end_turn", (roomId) => {

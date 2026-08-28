@@ -1,13 +1,11 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameStore } from "../../../store/useGameStore";
 
-interface NotificationBannerProps {
-  notification: { type: string; message: string } | null;
-}
+export const NotificationBanner: React.FC = () => {
+  // Pasiimame pranešimo būseną tiesiai iš Zustand store
+  const notification = useGameStore((s) => s.notification);
 
-export const NotificationBanner: React.FC<NotificationBannerProps> = ({
-  notification,
-}) => {
   return (
     <AnimatePresence>
       {notification && (

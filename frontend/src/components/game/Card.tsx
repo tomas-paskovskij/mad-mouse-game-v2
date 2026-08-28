@@ -2,8 +2,8 @@ import React from "react";
 import { motion } from "framer-motion";
 import "./Card.css";
 
-interface CardProps {
-  id: string;
+export interface CardProps {
+  id?: string;
   instanceId: string;
   type: "action" | "trap" | "response" | "interrupt" | "curse" | "goal";
   title: string;
@@ -12,11 +12,11 @@ interface CardProps {
   isLightning?: boolean;
   requiresTarget?: boolean;
   hidden?: boolean;
+  isFlipped?: boolean; // Pridėta: leidžia dinamikai apversti kortą
   onClick?: () => void;
   compact?: boolean;
 }
 
-// Art per efektą
 const CARD_ART: Record<string, string> = {
   draw_two: "🫐🫐",
   draw_three: "🫐🫐🫐",
@@ -91,85 +91,94 @@ const Card: React.FC<CardProps> = ({
   description,
   effect,
   isLightning,
-  hidden,
+  hidden = false,
+  isFlipped = false,
   onClick,
   compact,
 }) => {
   const cfg = TYPE_CONFIG[type] || TYPE_CONFIG.action;
   const art = CARD_ART[effect] || CARD_ART.default;
 
-  if (hidden) {
-    return (
-      <div className="card card--hidden" onClick={onClick}>
-        <div className="card-hidden-bg">
-          <div className="card-hidden-pattern" />
-          <span className="card-hidden-icon">?</span>
-        </div>
-      </div>
-    );
-  }
+  // Jei korta pažymėta kaip Paslėpta (hidden) ir nėra apversta
+  const showBack = hidden && !isFlipped;
 
   return (
     <motion.div
       layoutId={instanceId}
-      className={`card card--light card--${type} ${compact ? "card--compact" : ""}`}
-      style={
-        {
-          "--card-color": cfg.color,
-          "--card-bg": cfg.bg,
-          "--card-border": cfg.border,
-        } as any
-      }
+      className={`card-wrapper ${compact ? "card-wrapper--compact" : ""}`}
       onClick={onClick}
       whileHover={
         !compact ? { y: -10, scale: 1.04, transition: { duration: 0.12 } } : {}
       }
       whileTap={{ scale: 0.95 }}
     >
-      {/* Ornamentiniai kampai */}
-      <div className="card-corner card-corner--tl" />
-      <div className="card-corner card-corner--tr" />
-      <div className="card-corner card-corner--bl" />
-      <div className="card-corner card-corner--br" />
-
-      {/* Viršus — tipas + lightning */}
-      <div className="card-top">
+      <div className={`card-inner ${showBack ? "is-flipped" : ""}`}>
+        {/* PRIEKINĖ PUSĖ (Front) */}
         <div
-          className="card-type-badge"
-          style={{ color: cfg.color, borderColor: cfg.border }}
+          className={`card card--light card--${type} ${
+            compact ? "card--compact" : ""
+          }`}
+          style={
+            {
+              "--card-color": cfg.color,
+              "--card-bg": cfg.bg,
+              "--card-border": cfg.border,
+            } as any
+          }
         >
-          {cfg.label}
+          <div className="card-corner card-corner--tl" />
+          <div className="card-corner card-corner--tr" />
+          <div className="card-corner card-corner--bl" />
+          <div className="card-corner card-corner--br" />
+
+          <div className="card-top">
+            <div
+              className="card-type-badge"
+              style={{ color: cfg.color, borderColor: cfg.border }}
+            >
+              {cfg.label}
+            </div>
+            {isLightning && <span className="card-lightning-badge">⚡</span>}
+          </div>
+
+          <div className="card-title-light" style={{ color: cfg.color }}>
+            {title}
+          </div>
+
+          <div className="card-art-light">
+            <div
+              className="card-art-circle"
+              style={{ background: cfg.bg, borderColor: cfg.border }}
+            >
+              <span className="card-art-emoji">{art}</span>
+            </div>
+          </div>
+
+          <div
+            className="card-divider-light"
+            style={{ background: cfg.border + "44" }}
+          />
+          <div className="card-desc-light" style={{ color: cfg.color + "cc" }}>
+            {description}
+          </div>
+
+          <div
+            className="card-bottom-ornament"
+            style={{ color: cfg.color + "33" }}
+          >
+            ✦
+          </div>
         </div>
-        {isLightning && <span className="card-lightning-badge">⚡</span>}
-      </div>
 
-      {/* Pavadinimas */}
-      <div className="card-title-light" style={{ color: cfg.color }}>
-        {title}
-      </div>
-
-      {/* Iliustracija */}
-      <div className="card-art-light">
-        <div
-          className="card-art-circle"
-          style={{ background: cfg.bg, borderColor: cfg.border }}
-        >
-          <span className="card-art-emoji">{art}</span>
+        {/* GALINĖ PUSĖ (Back) */}
+        <div className="card card--back">
+          <div className="card-hidden-bg">
+            <div className="card-hidden-pattern" />
+            <div className="card-back-inner-border">
+              <span className="card-hidden-icon">✦</span>
+            </div>
+          </div>
         </div>
-      </div>
-
-      {/* Aprašymas */}
-      <div
-        className="card-divider-light"
-        style={{ background: cfg.border + "44" }}
-      />
-      <div className="card-desc-light" style={{ color: cfg.color + "cc" }}>
-        {description}
-      </div>
-
-      {/* Apatinis ornamentas */}
-      <div className="card-bottom-ornament" style={{ color: cfg.color + "33" }}>
-        ✦
       </div>
     </motion.div>
   );
