@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Card from "../Card";
 import { useGameStore } from "../../../store/useGameStore";
+import { CardSlider } from "../../ui/CardSlider";
 
 export const PlayerStealModal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"hand" | "table">("hand");
@@ -66,12 +67,12 @@ export const PlayerStealModal: React.FC = () => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-6 w-full max-w-2xl shadow-2xl relative flex flex-col gap-4"
+            className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-6 w-full max-w-2xl shadow-2xl relative flex flex-col gap-4 overflow-hidden"
           >
             {/* Uždarymo mygtukas */}
             <button
               onClick={handleClose}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white text-xl font-bold transition-colors"
+              className="absolute top-4 right-4 text-slate-400 hover:text-white text-xl font-bold transition-colors z-10"
             >
               ✕
             </button>
@@ -113,45 +114,47 @@ export const PlayerStealModal: React.FC = () => {
               </button>
             </div>
 
-            {/* Kortų sąrašas */}
-            <div className="min-h-[200px] max-h-[350px] overflow-y-auto p-2 border border-slate-800 rounded-xl bg-slate-950/50 flex flex-wrap gap-3 justify-center items-center">
+            {/* Kortų sąrašas su CardSlider */}
+            <div className="min-h-[180px] p-2 border border-slate-800 rounded-xl bg-slate-950/50 flex items-center justify-center w-full min-w-0">
               {currentCards.length === 0 ? (
                 <p className="text-slate-500 text-sm">
                   Šioje vietoje kortų nėra.
                 </p>
               ) : (
-                currentCards.map((item: any, idx) => {
-                  const cardObj = item.card ? item.card : item;
+                <CardSlider
+                  items={currentCards}
+                  showSeparators={false}
+                  renderItem={(item: any, idx: number) => {
+                    return (
+                      <motion.div
+                        key={item.instanceId || item.id || idx}
+                        whileHover={{ scale: 1.05, y: -5 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleStealCard(item, activeTab)}
+                        className="cursor-pointer relative group my-2"
+                      >
+                        {/* Užversta korta */}
+                        <div className="w-24 h-36 bg-indigo-950 border-2 border-indigo-500/50 rounded-lg flex flex-col items-center justify-center gap-2 group-hover:border-indigo-400 transition-colors shadow-lg">
+                          <span className="text-2xl font-bold text-indigo-300">
+                            ?
+                          </span>
+                          <span className="text-[10px] text-indigo-400 uppercase font-semibold text-center px-1">
+                            {activeTab === "hand"
+                              ? `Korta #${idx + 1}`
+                              : `Stalo #${idx + 1}`}
+                          </span>
+                        </div>
 
-                  return (
-                    <motion.div
-                      key={cardObj.instanceId || item.id || idx}
-                      whileHover={{ scale: 1.05, y: -5 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleStealCard(item, activeTab)}
-                      className="cursor-pointer relative group"
-                    >
-                      {/* 2 SPRENDIMAS: Tiek rankos, tiek stalo kortos modale rodomos užverstos metant ? */}
-                      <div className="w-24 h-36 bg-indigo-950 border-2 border-indigo-500/50 rounded-lg flex flex-col items-center justify-center gap-2 group-hover:border-indigo-400 transition-colors shadow-lg">
-                        <span className="text-2xl font-bold text-indigo-300">
-                          ?
-                        </span>
-                        <span className="text-[10px] text-indigo-400 uppercase font-semibold text-center px-1">
-                          {activeTab === "hand"
-                            ? `Korta #${idx + 1}`
-                            : `Stalo #${idx + 1}`}
-                        </span>
-                      </div>
-
-                      {/* Užvedimo (Hover) efektas */}
-                      <div className="absolute inset-0 bg-indigo-600/80 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                        <span className="text-white text-xs font-bold uppercase tracking-wider bg-slate-900 px-2 py-1 rounded shadow">
-                          Atimti
-                        </span>
-                      </div>
-                    </motion.div>
-                  );
-                })
+                        {/* Užvedimo (Hover) efektas */}
+                        <div className="absolute inset-0 bg-indigo-600/80 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <span className="text-white text-xs font-bold uppercase tracking-wider bg-slate-900 px-2 py-1 rounded shadow">
+                            Atimti
+                          </span>
+                        </div>
+                      </motion.div>
+                    );
+                  }}
+                />
               )}
             </div>
           </motion.div>

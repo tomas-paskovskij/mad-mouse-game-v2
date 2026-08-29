@@ -49,9 +49,6 @@ export const PlayModal: React.FC<PlayModalProps> = ({
             <Card {...entry.card} instanceId={`modal-${entry.id}`} />
           </div>
         )}
-        {!entry.isTrap && (
-          <p className="play-modal-desc">{entry.card.description}</p>
-        )}
       </motion.div>
       <div className="play-modal-timer-bar-wrap">
         <motion.div
@@ -61,28 +58,6 @@ export const PlayModal: React.FC<PlayModalProps> = ({
           transition={{ duration: 4.5, ease: "linear" }}
         />
       </div>
-      {chain.length > 1 && (
-        <div className="play-modal-chain-preview">
-          <div className="section-label">CURRENT CHAIN WILL UPDATE</div>
-          <div className="chain-row">
-            {chain.map((e, i) => (
-              <React.Fragment key={e.id}>
-                <div
-                  className={`chain-slot ${e.id === entry.id ? "chain-slot--active" : ""}`}
-                >
-                  <span className="chain-num">{i + 1}</span>
-                  {e.isTrap ? (
-                    <div className="chain-facedown">?</div>
-                  ) : (
-                    <Card {...e.card} instanceId={`pm-${e.id}`} compact />
-                  )}
-                </div>
-                {i < chain.length - 1 && <span className="chain-arrow">→</span>}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
     <button className="skip-btn" onClick={onSkip}>
       Praleisti ▶

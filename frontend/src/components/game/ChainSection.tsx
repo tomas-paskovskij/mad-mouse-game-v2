@@ -1,9 +1,9 @@
 import React from "react";
 import Card from "./Card";
 import { useGameStore } from "../../store/useGameStore";
+import { CardSlider } from "../ui/CardSlider";
 
 export const ChainSection: React.FC = () => {
-  // 1. Saugiai tikriname Zustand būsenas per selectorius
   const chain = useGameStore((s: any) => {
     const list =
       s.chain || s.chainEvents || s.pendingCards || s.chainStore?.chain;
@@ -17,42 +17,82 @@ export const ChainSection: React.FC = () => {
     (s: any) => s.stageIdx ?? s.chainStore?.stageIdx ?? 0,
   );
 
+  // Saugiai paimame bet kurią prieinamą peržiūros/priartinimo funkciją iš store
+  const openZoomModal = useGameStore((s: any) => {
+    return (
+      s.setZoomedCard ||
+      s.setTrapZoom ||
+      s.setSelectedCard ||
+      s.setInspectCard ||
+      ((card: any) =>
+        console.log("Nėra peržiūros funkcijos store, korta:", card))
+    );
+  });
+
+  const handleInspectCard = (e: any, cardData: any) => {
+    // Apjungiame kortelės objektą, kad peržiūros modalas gautų visus laukus (title, description ir t.t.)
+    const rawCard = cardData || e;
+    const fullCardToInspect = {
+      ...e,
+      ...rawCard,
+      ...(rawCard.card || {}),
+      isFlipped: true,
+      hidden: false,
+      readOnly: true, // Kad nerodytų veiksmo mygtukų "Žaisti/Išmesti"
+    };
+
+    openZoomModal(fullCardToInspect);
+  };
+
   return (
-    <section className="chain-section my-2 w-full">
+    <section className="chain-section my-2 w-full min-w-0">
       <div className="section-label font-bold text-xs text-slate-400 mb-2">
         AKTYVUOTOS KORTOS (CHAIN) {chain.length > 0 && `(${chain.length})`}
       </div>
 
-      <div className="chain-row flex gap-3 items-center flex-wrap min-h-[120px] bg-black/20 p-2.5 rounded-lg">
+      <div className="chain-row w-full min-w-0 min-h-[120px] bg-black/20 p-2.5 rounded-lg overflow-hidden">
         {chain.length === 0 ? (
           <span className="chain-empty text-slate-500 text-xs italic">
             Šiuo metu nėra aktyvuotų kortų
           </span>
         ) : (
-          chain.map((e: any, i: number) => {
-            if (!e) return null;
+          <CardSlider
+            items={chain}
+            showSeparators={true}
+            renderItem={(e: any, i: number) => {
+              if (!e) return null;
 
-            const isActive = stageActive && stageIdx === i;
-            const isDone = i < stageIdx;
-            const playerName =
-              e.playerName ||
-              e.ownerName ||
-              e.ownerUsername ||
-              e.player ||
-              "Žaidėjas";
-            const elementId = e.id || e.instanceId || `chain-item-${i}`;
+              const isActive = stageActive && stageIdx === i;
+              const isDone = i < stageIdx;
+              const playerName =
+                e.playerName ||
+                e.ownerName ||
+                e.ownerUsername ||
+                e.player ||
+                "Žaidėjas";
+              const elementId = e.id || e.instanceId || `chain-item-${i}`;
 
-            // Universalus kortos duomenų ištraukimas
-            const cardData =
-              e.card ||
-              e.cardInstance ||
-              e.item ||
-              (e.title || e.name ? e : null);
+              const cardData =
+                e.card ||
+                e.cardInstance ||
+                e.item ||
+                (e.title || e.name ? e : null);
 
-            return (
-              <React.Fragment key={elementId}>
+              const isUnknownTrap = Boolean(e.isTrap && !cardData);
+
+              return (
                 <div
-                  className={`chain-slot flex flex-col items-center p-1.5 rounded-lg bg-slate-800 ${
+                  key={elementId}
+                  onClick={() => {
+                    if (!isUnknownTrap) {
+                      handleInspectCard(e, cardData);
+                    }
+                  }}
+                  className={`chain-slot flex flex-col items-center p-1.5 rounded-lg bg-slate-800 transition-transform active:scale-95 ${
+                    isUnknownTrap
+                      ? "cursor-not-allowed"
+                      : "cursor-pointer hover:bg-slate-700/80 hover:scale-105"
+                  } ${
                     isActive
                       ? "ring-2 ring-yellow-500"
                       : isDone
@@ -64,19 +104,20 @@ export const ChainSection: React.FC = () => {
                     #{i + 1}
                   </span>
 
-                  {/* Jei korta yra užversti spąstai */}
-                  {e.isTrap && !cardData ? (
+                  {isUnknownTrap ? (
                     <div className="chain-facedown w-20 h-28 bg-slate-700 rounded-md flex items-center justify-center text-2xl text-slate-400">
                       ❓
                     </div>
                   ) : cardData ? (
-                    /* Saugiai perduodame ir kaip 'card' prop, ir atskirais props, priklausomai nuo Card komponento */
-                    <Card
-                      card={cardData}
-                      {...cardData}
-                      instanceId={`chain-${elementId}`}
-                      compact
-                    />
+                    /* pointer-events-none užtikrina, kad klikas prasiskverbs iki div konteinerio */
+                    <div className="pointer-events-none">
+                      <Card
+                        card={cardData}
+                        {...cardData}
+                        instanceId={`chain-${elementId}`}
+                        compact
+                      />
+                    </div>
                   ) : (
                     <div className="w-20 h-28 bg-slate-900 rounded-md p-1 text-[10px] text-white flex items-center justify-center text-center">
                       {e.title || e.name || "Korta"}
@@ -87,15 +128,9 @@ export const ChainSection: React.FC = () => {
                     {playerName}
                   </span>
                 </div>
-
-                {i < chain.length - 1 && (
-                  <span className="chain-arrow text-slate-500 font-bold text-sm">
-                    ➔
-                  </span>
-                )}
-              </React.Fragment>
-            );
-          })
+              );
+            }}
+          />
         )}
       </div>
     </section>

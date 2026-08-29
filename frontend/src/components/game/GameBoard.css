@@ -99,8 +99,8 @@
   display: grid;
   grid-template-rows:
     minmax(100px, 1fr)
-    minmax(250px, 4fr)
-    minmax(150px, 2fr);
+    minmax(250px, 3fr)
+    minmax(150px, auto);
 }
 
 /* ─── MAIN SIDE SECTION ──────────────────────────────────────────────────────────── */
@@ -136,6 +136,7 @@
   overflow-x: auto;
   padding-bottom: 2px;
   scrollbar-width: none;
+  height: 100%;
 }
 .chain-row::-webkit-scrollbar {
   display: none;
@@ -1282,4 +1283,173 @@
 }
 .wbtn--lobby:hover {
   color: white;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.card-menu {
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 24px;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  max-width: 360px;
+  width: 90%;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+}
+.card-menu--zoomed .card-desc-light {
+  max-height: 120px; /* Užtikrina, kad tekstas neužimtų visos kortos */
+  overflow-y: auto; /* Įjungia vertikalų scroll, jei tekstas per ilgas */
+  padding-right: 4px; /* Šiek tiek vietos nuo scroll juostos */
+  word-break: break-word; /* Neleidžia ilgiems žodžiams išlįsti iš ribų */
+}
+
+.menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.menu-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  color: #ffffff;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.menu-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.menu-btn:active {
+  transform: translateY(0);
+}
+
+/* Mygtukų spalvos */
+.menu-btn--inspect {
+  background: #2563eb;
+}
+.menu-btn--play {
+  background: #16a34a;
+}
+.menu-btn--give {
+  background: #4f46e5;
+}
+.menu-btn--trap {
+  background: #d97706;
+  color: #fff;
+}
+.menu-btn--mulligan {
+  background: #9333ea;
+}
+.menu-btn--discard {
+  background: #dc2626;
+}
+.menu-btn--back {
+  background: #334155;
+  margin-top: 6px;
+}
+
+/* Naujas Perdavimo (Give) Meniu Stilius */
+.give-picker-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.give-picker-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.give-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.give-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.give-picker-item:hover {
+  background: #334155;
+  border-color: #6366f1;
+}
+
+.give-avatar {
+  font-size: 16px;
+}
+
+.give-name {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.give-picker-empty {
+  font-size: 13px;
+  color: #64748b;
+  text-align: center;
+  padding: 16px 0;
+}
+
+.overlay-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 20px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.overlay-close:hover {
+  color: #fff;
 }

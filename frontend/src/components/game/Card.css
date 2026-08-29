@@ -148,6 +148,9 @@
   font-family: Georgia, serif;
   font-style: italic;
 }
+.card-menu--zoomed .card-desc-light {
+  font-size: clamp(0.6rem, 1vw, 0.9rem);
+}
 
 .zoom-wrap .card-desc-light {
   overflow-y: scroll;
@@ -334,3 +337,6 @@
   height: clamp(78px, 19.5vw, 102px);
 }
 */
+.overlay .card .card-desc-light {
+  /* font-size: 16px; */
+}

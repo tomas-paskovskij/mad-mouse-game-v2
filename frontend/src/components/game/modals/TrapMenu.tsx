@@ -12,7 +12,13 @@ export const TrapMenu: React.FC = () => {
 
   // Store veiksmai (PATAISYTA: naudojame teisingus store veiksmus)
   const setTrapActivating = useGameStore((s) => s.setTrapActivating);
-  const setTrapZoom = useGameStore((s) => s.setTrapZoom);
+  const setTrapZoom = useGameStore(
+    (s) =>
+      (s as any).setTrapZoom ||
+      (s as any).setZoomedCard ||
+      (s as any).setSelectedCard ||
+      (() => {}),
+  );
   const activateTrap = useGameStore((s) => s.activateTrap);
 
   const isMyTurn = currentTurnPlayerId === mySocketId;

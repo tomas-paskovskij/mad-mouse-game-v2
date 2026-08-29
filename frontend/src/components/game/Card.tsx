@@ -5,16 +5,23 @@ import "./Card.css";
 export interface CardProps {
   id?: string;
   instanceId: string;
-  type: "action" | "trap" | "response" | "interrupt" | "curse" | "goal";
-  title: string;
-  description: string;
-  effect: string;
+  type?: "action" | "trap" | "response" | "interrupt" | "curse" | "goal";
+  title?: string;
+  description?: string;
+  effect?: string;
   isLightning?: boolean;
   requiresTarget?: boolean;
   hidden?: boolean;
-  isFlipped?: boolean; // Pridėta: leidžia dinamikai apversti kortą
+  isFlipped?: boolean;
   onClick?: () => void;
   compact?: boolean;
+  card?: {
+    type?: "action" | "trap" | "response" | "interrupt" | "curse" | "goal";
+    title?: string;
+    description?: string;
+    effect?: string;
+    isLightning?: boolean;
+  };
 }
 
 const CARD_ART: Record<string, string> = {
@@ -84,18 +91,24 @@ const TYPE_CONFIG: Record<
   goal: { label: "GOAL", color: "#6b5a1a", bg: "#fbf5e8", border: "#d4b44a" },
 };
 
-const Card: React.FC<CardProps> = ({
-  instanceId,
-  type,
-  title,
-  description,
-  effect,
-  isLightning,
-  hidden = false,
-  isFlipped = false,
-  onClick,
-  compact,
-}) => {
+const Card: React.FC<CardProps> = (props) => {
+  const {
+    instanceId,
+    isLightning: directIsLightning,
+    hidden = false,
+    isFlipped = false,
+    onClick,
+    compact,
+    card: innerCard,
+  } = props;
+
+  // Ištraukiame reikšmes: pirmenybė teikiama tiesioginiams props, jei jų nėra – imame iš props.card
+  const type = props.type || innerCard?.type || "trap";
+  const title = props.title || innerCard?.title || "Spąstai";
+  const description = props.description || innerCard?.description || "";
+  const effect = props.effect || innerCard?.effect || "";
+  const isLightning = directIsLightning ?? innerCard?.isLightning;
+
   const cfg = TYPE_CONFIG[type] || TYPE_CONFIG.action;
   const art = CARD_ART[effect] || CARD_ART.default;
 
