@@ -64,6 +64,28 @@ function makeEntry(card, ownerUsername) {
   return { ...card, ownerUsername: ownerUsername || "?" };
 }
 
+// function processCurses(roomId, playerId) {
+//   const game = games[roomId];
+//   if (!game) return;
+//   const player = game.players.find((p) => p.id === playerId);
+//   if (!player || !player.curses) return;
+
+//   player.curses = player.curses.filter((curse) => {
+//     // Kiekvieno ėjimo pradžioje sumažiname likusį laiką per 1
+//     curse.turnsLeft--;
+
+//     if (curse.turnsLeft <= 0) {
+//       io.to(roomId).emit("game_notification", {
+//         message: `✨ ${player.username} prakeikimas "${curse.title}" pasibaigė!`,
+//         type: "info",
+//       });
+//     }
+
+//     // Paliekame tik tuos efektus, kurių laikas dar nepasibaigė (> 0)
+//     return curse.turnsLeft > 0;
+//   });
+// }
+
 function broadcastGameState(roomId) {
   const game = games[roomId];
   if (!game) return;
@@ -74,11 +96,35 @@ function broadcastGameState(roomId) {
     const isBlind = (player.curses || []).some(
       (c) => c.effect === "curse_blind",
     );
+
+    const activeEffects = (player.curses || []).map((curse, idx) => ({
+      id: curse.id || `effect-${idx}`,
+      title: curse.title || "Prakeikimas",
+      type: curse.type || "CURSE",
+      description: curse.description || "Aktyvus efektas",
+      icon: curse.icon || "🤐",
+      remainingTurns: curse.turnsLeft,
+      maxTurns: curse.maxTurns || 2,
+      stacks: 1,
+    }));
+
+    console.log(
+      "📤 Siunčiami activeEffects žaidėjui:",
+      player.username,
+      activeEffects,
+    );
+
     sock.emit("game_state_update", {
       myCards: isBlind
         ? player.cards.map((c) => ({ ...c, hidden: true }))
         : player.cards,
       myTrapZoneCards: [],
+      activeEffects: activeEffects,
+      allCurses: game.players.map((p) => ({
+        playerId: p.id,
+        username: p.username,
+        curses: p.curses || [],
+      })),
       opponents: game.players.map((p) => ({
         id: p.id,
         username: p.username,
@@ -758,12 +804,49 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
       });
       break;
     }
+    case "curse_silence": {
+      if (!target) break;
+      if (!target.curses) target.curses = [];
+
+      console.log(
+        "🎯 Prakeikimas priskirtas žaidėjui:",
+        target?.username,
+        "Būsena:",
+        target?.curses,
+      );
+
+      // 1. Įrašome prakeikimą į žaidėjo būseną serveryje
+      target.curses.push({
+        id: `curse-${Date.now()}`,
+        effect: "curse_silence",
+        title: card.title,
+        type: "CURSE",
+        description: card.description,
+        icon: card.art || "🤐",
+        turnsLeft: card.duration || 2,
+        maxTurns: card.duration || 2,
+        initiatorUsername: initiator.username,
+      });
+
+      // 2. Pranešame visiems apie uždėtą prakeikimą
+      io.to(roomId).emit("game_notification", {
+        message: `🤐 ${initiator.username} uždėjo "${card.title}" žaidėjui ${target.username}!`,
+        type: "curse",
+      });
+
+      // 3. Atnaujiname žaidimo lauko būseną visiems
+      broadcastGameState(roomId);
+      break;
+    }
     case "curse_give_left": {
       if (!target) break;
       if (!target.curses) target.curses = [];
       target.curses.push({
         effect: "curse_give_left",
+        title: card.title,
+        description: card.description,
         turnsLeft: card.duration || 3,
+        maxTurns: card.duration || 3,
       });
       if (!game.tableCards) game.tableCards = [];
       game.tableCards.push({
@@ -1178,16 +1261,7 @@ io.on("connection", (socket) => {
     // 1. Pagrindinės patikros
     if (!game || game.winner) return;
     const player = game.players.find((p) => p.id === socket.id);
-    /*
-    // Galima naudoti tik per savo ejima
-    const player = game.players.find((p) => p.id === socket.id);
     if (!player) return;
-
-    const isMyTurn = game.players[game.currentTurnIndex].id === socket.id;
-    if (!isMyTurn) return socket.emit("error_message", "Ne tavo ėjimas!");
-    if (game.actionUsed)
-      return socket.emit("error_message", "Jau panaudojai veiksmą!");
-    */
 
     // 2. Surandame kortą žaidėjo rankoje
     const cardIdx = player.cards.findIndex(
@@ -1197,26 +1271,39 @@ io.on("connection", (socket) => {
 
     const card = player.cards[cardIdx];
 
-    // 2+ Ismetam korta (extra move)
+    console.log(
+      "📥 Serveris gavo kortos vykdymą:",
+      card.effect,
+      "Taikinys:",
+      targetId,
+    );
+
+    // Išmetam kortą (extra move)
     if (extraData?.discard) {
       player.cards.splice(cardIdx, 1);
-
       game.discardPile.push(makeEntry(card, player.username));
-
-      game.actionUsed = true;
 
       io.to(roomId).emit("game_notification", {
         message: `${player.username} išmetė kortą.`,
-
         type: "action",
       });
 
       broadcastGameState(roomId);
-
       return;
     }
 
-    // 4. LOGIKA: Jei trap -> į spąstų zoną, jei ne -> į išmestų krūvą
+    // Jei korta reikalauja taikinio, o jo nėra – atidarome pasirinkimo langą
+    if (card.requiresTarget && !targetId) {
+      game.pendingAction = { card, initiatorId: socket.id };
+      io.to(roomId).emit("action_needs_target", {
+        card,
+        initiatorId: socket.id,
+      });
+      broadcastGameState(roomId);
+      return;
+    }
+
+    // Spąstų kortų logika
     if (card.type === "trap") {
       game.tableCards.push({
         id: `tc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -1233,11 +1320,9 @@ io.on("connection", (socket) => {
         type: "trap",
       });
 
-      // console.log("player------", player);
       player.cards.splice(cardIdx, 1);
       broadcastGameState(roomId);
       return;
-      // player.myTrapZoneCards.push(makeEntry(card, player.username));
     }
 
     // 3. Išimame kortą iš rankos ir dedame į išmestų kortų krūvą
@@ -1245,14 +1330,51 @@ io.on("connection", (socket) => {
     game.discardPile.push(makeEntry(card, player.username));
     game.actionUsed = true;
 
-    // 4. Informuojame visus žaidėjus kambaryje apie padėtą kortą
+    // 4. KORTOS EFEKTŲ APDOROJIMAS (Čia pridedami prakeikimai ir kiti efektai)
+
+    const target = game.players.find((p) => p.id === targetId);
+    console.log(
+      "🎯 Rastas taikinys žaidėjas:",
+      target ? target.username : "NERASTAS!",
+    );
+    console.log(
+      "👥 Visi žaidėjai kambaryje:",
+      game.players.map((p) => ({ username: p.username, id: p.id })),
+    );
+    switch (card.effect) {
+      case "curse_silence": {
+        if (!target) break;
+        if (!target.curses) target.curses = [];
+
+        target.curses.push({
+          id: `curse-${Date.now()}`,
+          effect: "curse_silence",
+          title: card.title || "Tylos prakeikimas",
+          type: "CURSE",
+          description: card.description || "Negalima kalbėti.",
+          icon: card.art || "🤐",
+          turnsLeft: card.duration || 2,
+          maxTurns: card.duration || 2,
+          initiatorUsername: player.username,
+        });
+
+        io.to(roomId).emit("game_notification", {
+          message: `🤐 ${player.username} uždėjo "${card.title || "Tylos prakeikimas"}" žaidėjui ${target.username}!`,
+          type: "curse",
+        });
+        break;
+      }
+      // Čia vėliau galėsi pridėti ir kitus efektus, pvz., case "curse_blind": ...
+    }
+
+    // 5. Informuojame visus žaidėjus kambaryje apie padėtą kortą
     io.to(roomId).emit("card_played_display", {
       card: { ...card },
       playerName: player.username,
       playerId: socket.id,
     });
 
-    // 5. Atnaujiname bendrą žaidimo būseną (pvz., kad visi matytų sumažėjusį kortų skaičių rankoje)
+    // 6. Atnaujiname bendrą žaidimo būseną
     broadcastGameState(roomId);
   });
 

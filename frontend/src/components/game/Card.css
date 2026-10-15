@@ -12,11 +12,21 @@
   box-sizing: border-box;
 }
 .overlay .card {
-  width: clamp(80px, 20vw, 166px);
-  height: clamp(120px, 50vw, 240px);
+  width: clamp(80px, 73vw, 348px);
+  height: clamp(120px, 100vw, 438px);
 }
 .overlay .carad-menu {
   padding: 30px;
+}
+.overlay .card-type-badge {
+  font-size: 0.68rem;
+}
+.overlay .card-title-light {
+  font-size: clamp(1.5rem, 1.3vw, 0.65rem);
+}
+.overlay .card-desc-light {
+  font-size: clamp(1.2rem, 1vw, 0.5rem);
+  overflow-y: sroll;
 }
 
 /* ─── LIGHT / CREAM STYLE ─────────────────────────────────────────────────── */
@@ -167,8 +177,8 @@
 
 /* Compact versija (chain'e) */
 .card--compact {
-  width: clamp(52px, 13vw, 68px);
-  height: clamp(78px, 19.5vw, 102px);
+  width: clamp(156px, 86vw, 404px);
+  height: clamp(234px, 150vw, 1406px);
   padding: 4px;
   border-radius: 8px;
 }
@@ -233,15 +243,15 @@
 /* ─── COMPACT VERSIJA ───────────────────────────── */
 
 .card--compact {
-  width: clamp(156px, 39vw, 204px);
-  height: clamp(234px, 58.5vw, 306px);
+  width: clamp(156px, 86vw, 404px);
+  height: clamp(234px, 150vw, 506px);
   padding: 12px;
   border-radius: 24px;
 }
 
 /* Pavadinimas */
 .card--compact .card-title-light {
-  font-size: clamp(0.75rem, 2.6vw, 1.14rem);
+  font-size: clamp(1.35rem, 2.6vw, 1.14rem);
 }
 
 /* Art apskritimas – 3x */
@@ -269,7 +279,7 @@
 
 /* Aprašymas */
 .card--compact .card-desc-light {
-  font-size: clamp(0.8rem, 3vw, 1rem);
+  font-size: clamp(1.3rem, 3vw, 1rem);
 }
 
 /* ─── 3D CONTAINER IR NUGARĖLĖS STILIAI ──────────────────────────────────── */

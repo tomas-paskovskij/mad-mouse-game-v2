@@ -50,7 +50,7 @@ export const ChainSection: React.FC = () => {
         AKTYVUOTOS KORTOS (CHAIN) {chain.length > 0 && `(${chain.length})`}
       </div>
 
-      <div className="chain-row w-full min-w-0 min-h-[120px] bg-black/20 p-2.5 rounded-lg overflow-hidden">
+      <div className="chain-row w-full min-w-0 min-h-[120px] bg-black/20 rounded-lg overflow-hidden">
         {chain.length === 0 ? (
           <span className="chain-empty text-slate-500 text-xs italic">
             Šiuo metu nėra aktyvuotų kortų

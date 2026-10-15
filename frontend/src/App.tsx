@@ -97,7 +97,7 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-slate-900 text-white font-sans selection:bg-indigo-500/30">
-        <main className="container mx-auto px-4 py-4">
+        <main className="container mx-auto">
           <Routes>
             <Route
               path="/"

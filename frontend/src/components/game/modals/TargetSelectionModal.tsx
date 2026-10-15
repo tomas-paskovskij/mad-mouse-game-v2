@@ -41,6 +41,7 @@ export const TargetSelectionModal: React.FC = () => {
       setTrapActivating(null);
     } else if (actionNeedsTarget) {
       // Jei turite specialų veiksmą su stalo korta
+      playCard(actionNeedsTarget.card.instanceId, targetId);
       setActionNeedsTarget(null);
     }
   };

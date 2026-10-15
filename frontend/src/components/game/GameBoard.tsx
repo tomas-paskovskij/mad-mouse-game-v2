@@ -15,6 +15,7 @@ import { PilesSection } from "./PilesSection";
 import { HandSection } from "./HandSection";
 import { HistoryPanel } from "./HistoryPanel";
 import { ReactionWindow } from "./ReactionWindow";
+import { ActiveEffectsBar } from "./ActiveEffectsBar";
 
 // Modalai
 import { PlayModal } from "./modals/PlayModal";
@@ -30,6 +31,8 @@ import { InspectModal } from "./modals/InspectModal";
 import { InspectStealModal } from "./modals/InspectStealModal";
 
 import "./GameBoard.css";
+//Delete Laikinai prijungiame prie window, kad galėtume testuoti iš F12 konsolės
+// (window as any).useGameStore = useGameStore;
 
 export const GameBoard: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -62,6 +65,9 @@ export const GameBoard: React.FC = () => {
       />
     );
   }
+
+  const activeEffects = useGameStore((s) => s.activeEffects);
+  console.log("🔍 Ką mato frontend store:", activeEffects);
 
   return (
     <div className={`board rounded-[20px] ${isMyTurn ? "board--my-turn" : ""}`}>
@@ -132,7 +138,7 @@ export const GameBoard: React.FC = () => {
             </div>
           )}
         </div>
-
+        <ActiveEffectsBar />
         {/* Kaladės (Piles) sekcija */}
         <PilesSection />
       </div>

@@ -24,7 +24,7 @@ export const PilesSection: React.FC = () => {
     isMyTurn && !actionUsed && myCards.length < (handLimit || 100000);
 
   return (
-    <div className="main-side-section w-[150px] shrink-0">
+    <div className="main-side-section">
       <div className="piles-center">
         <div className="pile-col">
           <div

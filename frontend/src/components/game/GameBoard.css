@@ -92,23 +92,24 @@
 /* ─── MAIN CONTENT SECTION ──────────────────────────────────────────────────────────── */
 .main-content-side-section {
   max-width: 100%;
-  display: grid;
-  grid-template-columns: 1fr minmax(150px, auto);
+  /* display: grid; */
+  /* grid-template-columns: 1fr minmax(150px, auto); */
 }
-.main-content-section {
+/* .main-content-section {
   display: grid;
   grid-template-rows:
     minmax(100px, 1fr)
     minmax(250px, 3fr)
     minmax(150px, auto);
-}
+} */
 
 /* ─── MAIN SIDE SECTION ──────────────────────────────────────────────────────────── */
 .main-side-section {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-columns: 1fr auto;
   justify-content: center;
   align-items: center;
+  padding: 20px;
 }
 
 /* ─── SECTION LABEL ──────────────────────────────────────────────────────────── */
@@ -154,6 +155,9 @@
   flex-shrink: 0;
   transition: opacity 0.2s;
 }
+.chain-slot .card-type-badge {
+  font-size: 0.68rem;
+}
 .chain-slot--done {
   opacity: 0.4;
 }
@@ -167,7 +171,7 @@
   box-shadow: 0 0 12px rgba(124, 58, 237, 0.4);
 }
 .chain-num {
-  font-size: 0.46rem;
+  font-size: 1rem;
   color: rgba(255, 255, 255, 0.3);
   font-weight: 800;
   text-align: center;
@@ -330,8 +334,8 @@
 /* Piles center */
 .piles-center {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  gap: 20px;
   align-items: center;
   flex-shrink: 0;
 }

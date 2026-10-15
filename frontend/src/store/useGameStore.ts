@@ -59,6 +59,17 @@ export interface ChainEntry {
   isTrap?: boolean;
 }
 
+export interface ActiveEffect {
+  id: string;
+  title: string;
+  type: "CURSE" | "ACTION" | "TRAP" | "BUFF";
+  description: string;
+  icon: string;
+  remainingTurns: number;
+  maxTurns: number;
+  stacks?: number;
+}
+
 interface PendingAction {
   card: CardType;
   initiatorId: string;
@@ -73,6 +84,10 @@ interface GameStore {
   stageActive: boolean;
   stageIdx: number;
   stageTimer: ReturnType<typeof setTimeout> | null;
+  activeEffects: ActiveEffect[];
+  addActiveEffect: (effect: Omit<ActiveEffect, "id">) => void;
+  removeActiveEffect: (id: string) => void;
+  tickTurnEffects: () => void;
 
   myCards: CardType[];
   myTrapZoneCards: CardType[];
@@ -149,6 +164,9 @@ interface GameStore {
   clearInspect: () => void;
   clearInspectSteal: () => void;
   clearActionNeedsTarget: () => void;
+  setActionNeedsTarget: (
+    val: { card: CardType; initiatorId: string } | null,
+  ) => void;
   passReaction: () => void;
   activateTrapReaction: (tableCardId: string, targetId?: string) => void;
 
@@ -191,6 +209,28 @@ export const useGameStore = create<GameStore>()(
       stageActive: false,
       stageIdx: 0,
       stageTimer: null,
+      activeEffects: [
+        {
+          id: "test-1",
+          title: "Tylos prakeikimas",
+          type: "CURSE",
+          description: "Negalite kalbėti 2 ėjimus.",
+          icon: "🧁",
+          remainingTurns: 2,
+          maxTurns: 2,
+          stacks: 1,
+        },
+        {
+          id: "test-1",
+          title: "Tylos prakeikimas",
+          type: "CURSE",
+          description: "Negalite kalbėti 2 ėjimus.",
+          icon: "🧁",
+          remainingTurns: 2,
+          maxTurns: 2,
+          stacks: 1,
+        },
+      ],
 
       myCards: [],
       myTrapZoneCards: [],
@@ -224,6 +264,29 @@ export const useGameStore = create<GameStore>()(
       canDeclare: false,
       trapActivating: null,
       stealTargetPlayer: null,
+
+      addActiveEffect: (effect) =>
+        set((state) => ({
+          activeEffects: [
+            { ...effect, id: `effect-${Date.now()}` },
+            ...state.activeEffects, // Naujas efektas eina į priekį!
+          ],
+        })),
+
+      removeActiveEffect: (id) =>
+        set((state) => ({
+          activeEffects: state.activeEffects.filter((e) => e.id !== id),
+        })),
+
+      tickTurnEffects: () =>
+        set((state) => ({
+          activeEffects: state.activeEffects
+            .map((effect) => ({
+              ...effect,
+              remainingTurns: effect.remainingTurns - 1,
+            }))
+            .filter((effect) => effect.remainingTurns > 0),
+        })),
 
       // --- CHAIN VEIKSMŲ LOGIKA ---
       addChainEntry: (data) => {
@@ -310,6 +373,8 @@ export const useGameStore = create<GameStore>()(
           });
 
           socket.on("game_state_update", (state: any) => {
+            console.log("📥 Klientas gavo state update:", state.activeEffects);
+
             const myCards = state.myCards ?? [];
             const opponents = state.opponents ?? [];
             const players = state.players ?? opponents;
@@ -321,6 +386,7 @@ export const useGameStore = create<GameStore>()(
               myCards,
               handCards: myCards,
               myTrapZoneCards: state.myTrapZoneCards ?? [],
+              allCurses: state.allCurses || [],
               opponents,
               players,
               currentTurnPlayerId: state.currentTurnPlayerId ?? null,
@@ -335,6 +401,7 @@ export const useGameStore = create<GameStore>()(
               actionUsed: state.actionUsed ?? false,
               madMousePlayerId: state.madMousePlayerId ?? null,
               canDeclare: state.canDeclare ?? false,
+              activeEffects: state.activeEffects ?? s.activeEffects,
               elapsedSeconds:
                 typeof state.elapsedSeconds === "number"
                   ? state.elapsedSeconds
@@ -349,6 +416,10 @@ export const useGameStore = create<GameStore>()(
 
           socket.on("turn_chain_clear", () => {
             get().clearChain();
+          });
+
+          socket.on("add_active_effect", (effectData: any) => {
+            get().addActiveEffect(effectData);
           });
 
           socket.on(
@@ -426,7 +497,27 @@ export const useGameStore = create<GameStore>()(
 
       // --- GAME EMITS ---
       playCard: (cardInstanceId, targetId, extraData) => {
-        const { roomId } = get();
+        const { roomId, myCards } = get();
+
+        // 1. Randame kortą rankoje, kad patikrintume, ar jai reikia taikinio
+        const card = myCards.find((c) => c.instanceId === cardInstanceId);
+
+        // 2. Jei korta reikalauja taikinio, bet taikinys nepaduotas:
+        if (card?.requiresTarget && !targetId) {
+          console.log(
+            "🛑 Korta reikalauja taikinio! Atidarome pasirinkimo langą.",
+          );
+          set({
+            actionNeedsTarget: {
+              card,
+              initiatorId: get().mySocketId || "",
+            },
+            selectedCard: null,
+          });
+          return; // Sustabdom siuntimą į serverį kol nepasirinkta
+        }
+
+        // 3. Jei viskas gerai, siunčiame į serverį
         if (roomId)
           socket.emit("play_card", {
             roomId,
@@ -434,13 +525,19 @@ export const useGameStore = create<GameStore>()(
             targetId,
             extraData,
           });
-        set({ selectedCard: null });
+        set({ selectedCard: null, actionNeedsTarget: null });
       },
 
       selectTarget: (targetId, extraData) => {
-        const { roomId } = get();
-        if (roomId) {
-          socket.emit("select_target", { roomId, targetId, extraData });
+        const { roomId, actionNeedsTarget } = get();
+        if (roomId && actionNeedsTarget) {
+          // Siunčiame kortą į serverį su pasirinktu taikiniu!
+          socket.emit("play_card", {
+            roomId,
+            cardInstanceId: actionNeedsTarget.card.instanceId,
+            targetId,
+            extraData,
+          });
           set({ actionNeedsTarget: null });
         }
       },
@@ -501,6 +598,7 @@ export const useGameStore = create<GameStore>()(
       clearInspect: () => set({ inspectResult: null }),
       clearInspectSteal: () => set({ inspectStealResult: null }),
       clearActionNeedsTarget: () => set({ actionNeedsTarget: null }),
+      setActionNeedsTarget: (val) => set({ actionNeedsTarget: val }),
 
       // UI SETTERS
       setSelectedCard: (card) => set({ selectedCard: card }),

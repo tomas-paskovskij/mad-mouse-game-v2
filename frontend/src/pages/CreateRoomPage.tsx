@@ -73,7 +73,7 @@ const CreateRoomPage = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-20 p-8 bg-slate-800 rounded-[2.5rem] border border-slate-700 shadow-2xl">
+    <div className="max-w-md mx-auto p-8 bg-slate-800 rounded-[2.5rem] border border-slate-700 shadow-2xl">
       <h2 className="text-3xl font-black mb-8 text-center text-white uppercase italic tracking-tighter">
         Create <span className="text-indigo-500">Mission</span>
       </h2>
