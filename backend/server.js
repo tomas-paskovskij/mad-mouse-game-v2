@@ -1,9 +1,120 @@
+// Funkcija, kuri paima kortą iš specialios taskDeck kaladės
+function drawTaskCardForPlayer(game, player, specificType = null) {
+  // Patikrinimas: max 3 aktyvūs efektai
+  if (player.curses && player.curses.length >= 3) {
+    return null;
+  }
+
+  // Jei kaladė tuščia, išmaišome išmetimo krūvą
+  if (!game.taskDeck || game.taskDeck.length === 0) {
+    if (game.taskDiscardPile && game.taskDiscardPile.length > 0) {
+      game.taskDeck = game.taskDiscardPile.sort(() => Math.random() - 0.5);
+      game.taskDiscardPile = [];
+    } else {
+      return null;
+    }
+  }
+
+  let cardIndex = 0;
+  if (specificType) {
+    cardIndex = game.taskDeck.findIndex((c) => c.type === specificType);
+    if (cardIndex === -1) cardIndex = 0;
+  }
+
+  const drawnCard = game.taskDeck.splice(cardIndex, 1)[0];
+
+  // Sukuriame aktyvaus efekto objektą su naujais lauko tipais
+  const effectInstance = {
+    ...drawnCard,
+    id: drawnCard.instanceId || `${drawnCard.id}-${Date.now()}`,
+    icon: drawnCard.art,
+    durationType: drawnCard.durationType || "turns",
+    turnsLeft: drawnCard.duration || 2,
+    maxTurns: drawnCard.duration || 2,
+    remainingTurns: drawnCard.duration || 2,
+    stacks: 1,
+  };
+
+  // 👇 Įdėk šį logą ČIA:
+  console.log("1. KĄ SUKŪRĖ FUNKCIJA:", effectInstance);
+
+  if (!player.curses) {
+    player.curses = [];
+  }
+  player.curses.push(effectInstance);
+
+  // 👇 Ir šį logą ČIA:
+  console.log(
+    "2. KĄ ĮSTŪMĖM Į PLAYER.CURSES:",
+    player.curses[player.curses.length - 1],
+  );
+
+  return effectInstance;
+}
+
+// ==========================================
+// TIKSLI ĖJIMŲ IR RATŲ SKAIČIAVIMO LOGIKA
+// ==========================================
+function handleTurnAdvancement(game, roomId) {
+  if (!game || !game.players || game.players.length === 0) return;
+
+  // 1. Perjungiame ėjimą kitam žaidėjui
+  game.currentTurnIndex = (game.currentTurnIndex + 1) % game.players.length;
+  const nextPlayer = game.players[game.currentTurnIndex];
+
+  // 2. ĖJIMAI (`turns`): Mažėja PO KIEKVIENO ŽAIDĖJO ĖJIMO
+  game.players.forEach((player) => {
+    if (player.curses && player.curses.length > 0) {
+      player.curses.forEach((curse) => {
+        if (!curse.durationType || curse.durationType === "turns") {
+          curse.turnsLeft = (curse.turnsLeft ?? curse.remainingTurns ?? 1) - 1;
+        }
+      });
+    }
+  });
+
+  // 3. RATAI (`rounds`): Mažėja TIK TADA, KAI EILĖ GRĮŽTA PAS KORTOS SAVININKĄ
+  if (nextPlayer && nextPlayer.curses && nextPlayer.curses.length > 0) {
+    nextPlayer.curses.forEach((curse) => {
+      if (curse.durationType === "rounds") {
+        curse.turnsLeft = (curse.turnsLeft ?? curse.remainingTurns ?? 1) - 1;
+      }
+    });
+  }
+
+  // 4. IŠVALOME PASIBAIGUSIUS EFEKTUS IR SIUNČIAME PRANEŠIMUS
+  game.players.forEach((player) => {
+    if (player.curses && player.curses.length > 0) {
+      const expired = player.curses.filter((c) => c.turnsLeft <= 0);
+      player.curses = player.curses.filter((c) => c.turnsLeft > 0);
+
+      expired.forEach((expiredCard) => {
+        io.to(roomId).emit("effect_expired_notification", {
+          playerId: player.id,
+          username: player.username,
+          title: expiredCard.title,
+          type: expiredCard.type,
+        });
+      });
+    }
+  });
+}
+
 const express = require("express");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 const { instrument } = require("@socket.io/admin-ui");
 const cors = require("cors");
-const cardsData = require("./data/cards.json");
+const fs = require("fs");
+const path = require("path");
+
+const cardsData = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "data", "cards.json"), "utf8"),
+);
+
+const taskCardsData = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "data", "cards_tasks.json"), "utf8"),
+);
 
 const app = express();
 app.use(cors());
@@ -47,49 +158,51 @@ function emitRoomUpdate(roomId) {
   io.emit("update_rooms", rooms);
 }
 
-function createDeck() {
+function buildDeckFromData(cardsArray, prefix) {
   let deck = [];
-  cardsData.forEach((card) => {
+  cardsArray.forEach((card) => {
     const copies = card.count || 4;
-    for (let i = 0; i < copies; i++)
+    for (let i = 0; i < copies; i++) {
       deck.push({
         ...card,
-        instanceId: `${card.id}-${Math.random().toString(36).substr(2, 5)}`,
+        instanceId: `${prefix}-${card.id}-${Math.random().toString(36).substr(2, 5)}`,
       });
+    }
   });
   return deck.sort(() => Math.random() - 0.5);
+}
+
+function createDecks() {
+  return {
+    deck: buildDeckFromData(cardsData, "main"),
+    taskDeck: buildDeckFromData(taskCardsData, "task"),
+  };
 }
 
 function makeEntry(card, ownerUsername) {
   return { ...card, ownerUsername: ownerUsername || "?" };
 }
 
-// function processCurses(roomId, playerId) {
-//   const game = games[roomId];
-//   if (!game) return;
-//   const player = game.players.find((p) => p.id === playerId);
-//   if (!player || !player.curses) return;
-
-//   player.curses = player.curses.filter((curse) => {
-//     // Kiekvieno ėjimo pradžioje sumažiname likusį laiką per 1
-//     curse.turnsLeft--;
-
-//     if (curse.turnsLeft <= 0) {
-//       io.to(roomId).emit("game_notification", {
-//         message: `✨ ${player.username} prakeikimas "${curse.title}" pasibaigė!`,
-//         type: "info",
-//       });
-//     }
-
-//     // Paliekame tik tuos efektus, kurių laikas dar nepasibaigė (> 0)
-//     return curse.turnsLeft > 0;
-//   });
-// }
-
 function broadcastGameState(roomId) {
   const game = games[roomId];
   if (!game) return;
   const current = game.players[game.currentTurnIndex];
+
+  // Pagalbinė funkcija, kad nereikėtų rašyti to paties per naują
+  const formatCurses = (curses) =>
+    (curses || []).map((curse, idx) => ({
+      id: curse.id || `effect-${idx}`,
+      title: curse.title || "Prakeikimas",
+      type: curse.type || "CURSE",
+      description: curse.description || "Aktyvus efektas",
+      icon: curse.icon || "🤐",
+      durationType: curse.durationType || "turns",
+      turnsLeft: curse.turnsLeft,
+      remainingTurns: curse.turnsLeft,
+      maxTurns: curse.maxTurns || 2,
+      stacks: 1,
+    }));
+
   game.players.forEach((player) => {
     const sock = io.sockets.sockets.get(player.id);
     if (!sock) return;
@@ -97,16 +210,7 @@ function broadcastGameState(roomId) {
       (c) => c.effect === "curse_blind",
     );
 
-    const activeEffects = (player.curses || []).map((curse, idx) => ({
-      id: curse.id || `effect-${idx}`,
-      title: curse.title || "Prakeikimas",
-      type: curse.type || "CURSE",
-      description: curse.description || "Aktyvus efektas",
-      icon: curse.icon || "🤐",
-      remainingTurns: curse.turnsLeft,
-      maxTurns: curse.maxTurns || 2,
-      stacks: 1,
-    }));
+    const activeEffects = formatCurses(player.curses);
 
     console.log(
       "📤 Siunčiami activeEffects žaidėjui:",
@@ -133,7 +237,7 @@ function broadcastGameState(roomId) {
           instanceId: c.instanceId,
           hidden: true, // Paslepiame pavadinimą, tipą ir kitus duomenis
         })),
-        curses: p.curses || [],
+        curses: formatCurses(p.curses),
         isConnected: p.isConnected !== false,
         madMousePending: p.madMousePending || false,
       })),
@@ -264,7 +368,9 @@ function checkMadMouseAfter(roomId) {
 function nextTurn(roomId) {
   const game = games[roomId];
   if (!game || game.winner) return;
+
   processTimeBombs(roomId);
+
   let attempts = 0;
   do {
     game.currentTurnIndex = (game.currentTurnIndex + 1) % game.players.length;
@@ -273,11 +379,56 @@ function nextTurn(roomId) {
     game.players[game.currentTurnIndex].isConnected === false &&
     attempts < game.players.length
   );
+
   game.turnNumber = (game.turnNumber || 0) + 1;
   game.actionUsed = false;
+
   const current = game.players[game.currentTurnIndex];
-  processCurses(roomId, current.id);
+
+  // ==========================================
+  // TEISINGA ĖJIMŲ IR RATŲ SKAIČIAVIMO LOGIKA
+  // ==========================================
+
+  // 1. ĖJIMAI ("turns"): Mažėja visų žaidėjų kortoms, nes prasidėjo naujas bendras ėjimas
+  game.players.forEach((player) => {
+    if (player.curses && player.curses.length > 0) {
+      player.curses.forEach((curse) => {
+        if (!curse.durationType || curse.durationType === "turns") {
+          curse.turnsLeft = (curse.turnsLeft ?? curse.remainingTurns ?? 1) - 1;
+        }
+      });
+    }
+  });
+
+  // 2. RATAI ("rounds"): Mažėja TIK TADA, KAI EILĖ VĖL SUGRĮŽTA PAS ŠĮ ŽAIDĖJĄ (current)
+  if (current && current.curses && current.curses.length > 0) {
+    current.curses.forEach((curse) => {
+      if (curse.durationType === "rounds") {
+        curse.turnsLeft = (curse.turnsLeft ?? curse.remainingTurns ?? 1) - 1;
+      }
+    });
+  }
+
+  // 3. IŠVALOME PASIBAIGUSIUS EFEKTUS IR SIUNČIAME PRANEŠIMUS
+  game.players.forEach((player) => {
+    if (player.curses && player.curses.length > 0) {
+      const expired = player.curses.filter((c) => c.turnsLeft <= 0);
+      player.curses = player.curses.filter((c) => c.turnsLeft > 0);
+
+      expired.forEach((expiredCard) => {
+        io.to(roomId).emit("effect_expired_notification", {
+          playerId: player.id,
+          username: player.username,
+          title: expiredCard.title,
+          type: expiredCard.type,
+        });
+      });
+    }
+  });
+  // ==========================================
+
   if (checkMadMouseWin(roomId, current.id)) return;
+
   if (current.skippedTurns > 0) {
     current.skippedTurns--;
     io.to(roomId).emit("game_notification", {
@@ -287,12 +438,14 @@ function nextTurn(roomId) {
     nextTurn(roomId);
     return;
   }
+
   io.to(roomId).emit("turn_chain_clear");
   io.to(roomId).emit("game_notification", {
     message: `${current.username} ėjimas`,
     type: "turn",
     playerId: current.id,
   });
+
   broadcastGameState(roomId);
 }
 
@@ -1167,7 +1320,8 @@ io.on("connection", (socket) => {
       room.host !== room.players.find((p) => p.id === socket.id)?.username
     )
       return;
-    const deck = createDeck();
+    const { deck, taskDeck } = createDecks();
+
     const gamePlayers = room.players.map((p) => ({
       id: p.id,
       username: p.username,
@@ -1183,6 +1337,7 @@ io.on("connection", (socket) => {
     games[roomId] = {
       players: gamePlayers,
       deck,
+      taskDeck,
       discardPile: [],
       tableCards: [],
       currentTurnIndex: 0,
@@ -1252,6 +1407,39 @@ io.on("connection", (socket) => {
       type: "mad_mouse",
     });
     broadcastGameState(roomId);
+  });
+
+  // Testinis socket įvykis serveryje
+  socket.on("test_draw_card", (data) => {
+    console.log("📥 Gautas testinis traukimas:", data);
+
+    const game = games[data.roomId];
+    if (!game) return;
+
+    const player = game.players.find((p) => p.id === socket.id);
+    if (!player) return;
+
+    const cardType = data.type || "blessing";
+    const drawnCard = drawTaskCardForPlayer(game, player, cardType);
+
+    if (!drawnCard) {
+      // Pranešame, jei pasiektas 3 kortų limitas
+      socket.emit("test_card_received", {
+        success: false,
+        message: "⚠️ Pasiektas 3 efektų limitas!",
+      });
+      return;
+    }
+
+    // Pranešame apie sėkmingai ištrauktą kortą
+    socket.emit("test_card_received", {
+      success: true,
+      card: drawnCard,
+      message: `Gauta korta: ${drawnCard.title} (${drawnCard.type})`,
+    });
+
+    // Atnaujiname žaidimo būseną visiems
+    broadcastGameState(data.roomId);
   });
 
   socket.on("play_card", (data) => {
@@ -1650,6 +1838,7 @@ io.on("connection", (socket) => {
     const game = games[roomId];
     if (!game || game.winner) return;
     if (game.players[game.currentTurnIndex].id !== socket.id) return;
+
     nextTurn(roomId);
   });
 

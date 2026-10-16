@@ -210,30 +210,31 @@ export const useGameStore = create<GameStore>()(
       stageIdx: 0,
       stageTimer: null,
       activeEffects: [
-        {
-          id: "test-1",
-          title: "Tylos prakeikimas",
-          type: "CURSE",
-          description: "Negalite kalbėti 2 ėjimus.",
-          icon: "🧁",
-          remainingTurns: 2,
-          maxTurns: 2,
-          stacks: 1,
-        },
-        {
-          id: "test-1",
-          title: "Tylos prakeikimas",
-          type: "CURSE",
-          description: "Negalite kalbėti 2 ėjimus.",
-          icon: "🧁",
-          remainingTurns: 2,
-          maxTurns: 2,
-          stacks: 1,
-        },
+        // {
+        //   id: "test-1",
+        //   title: "Tylos prakeikimas",
+        //   type: "CURSE",
+        //   description: "Negalite kalbėti 2 ėjimus.",
+        //   icon: "🧁",
+        //   remainingTurns: 2,
+        //   maxTurns: 2,
+        //   stacks: 1,
+        // },
+        // {
+        //   id: "test-1",
+        //   title: "Tylos prakeikimas",
+        //   type: "CURSE",
+        //   description: "Negalite kalbėti 2 ėjimus.",
+        //   icon: "🧁",
+        //   remainingTurns: 2,
+        //   maxTurns: 2,
+        //   stacks: 1,
+        // },
       ],
 
       myCards: [],
       myTrapZoneCards: [],
+      allCurses: [],
       opponents: [],
       players: [],
       handCards: [],
@@ -264,6 +265,11 @@ export const useGameStore = create<GameStore>()(
       canDeclare: false,
       trapActivating: null,
       stealTargetPlayer: null,
+
+      testDrawCard: (roomId: string, type: "blessing" | "curse") => {
+        // Naudojame tą pačią socket konstanta/kintamąjį, kuris jau yra iškeltas viršutinėje store failo dalyje
+        socket.emit("test_draw_card", { roomId, type });
+      },
 
       addActiveEffect: (effect) =>
         set((state) => ({

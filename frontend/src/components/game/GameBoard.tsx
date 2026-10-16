@@ -16,6 +16,7 @@ import { HandSection } from "./HandSection";
 import { HistoryPanel } from "./HistoryPanel";
 import { ReactionWindow } from "./ReactionWindow";
 import { ActiveEffectsBar } from "./ActiveEffectsBar";
+import TaskTestPanel from "./TaskTestPanel";
 
 // Modalai
 import { PlayModal } from "./modals/PlayModal";
@@ -141,6 +142,9 @@ export const GameBoard: React.FC = () => {
         <ActiveEffectsBar />
         {/* Kaladės (Piles) sekcija */}
         <PilesSection />
+
+        {/* Laikinas testinis skydelis kampe */}
+        <TaskTestPanel roomId={roomId} />
       </div>
 
       {/* 4. ŽAIDĖJO KORTŲ RANKA */}
