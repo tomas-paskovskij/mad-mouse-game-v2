@@ -100,6 +100,99 @@ function handleTurnAdvancement(game, roomId) {
   });
 }
 
+// 1. Palaiminimo kortos aktyvavimas
+function activateBlessing(game, player) {
+  console.log(
+    `✨ [BLESSING] Žaidėjas ${player.username} surinko 3 palaiminimo taškus!`,
+  );
+  const drawnCard = drawTaskCardForPlayer(game, player, "blessing");
+
+  if (!drawnCard) {
+    console.log("⚠️ Pasiektas efektų limitas!");
+    return;
+  }
+
+  drawnCard.type = "blessing";
+
+  if (!player.activeEffects) player.activeEffects = [];
+  player.activeEffects.push(drawnCard);
+
+  io.to(game.id || game.roomId).emit("game_notification", {
+    message: `✨ ${player.username} gavo Palaiminimo kortą: ${drawnCard.title}!`,
+    type: "blessing",
+  });
+}
+
+// 2. Prakeiksmo kortos aktyvavimas
+function activateCurse(game, player) {
+  console.log(
+    `💀 [CURSE] Žaidėjas ${player.username} surinko 3 prakeiksmo taškus!`,
+  );
+  const drawnCard = drawTaskCardForPlayer(game, player, "curse");
+
+  if (!drawnCard) {
+    console.log("⚠️ Pasiektas efektų limitas!");
+    return;
+  }
+
+  drawnCard.type = "curse";
+
+  if (!player.curses) player.curses = [];
+  player.curses.push(drawnCard);
+
+  io.to(game.id || game.roomId).emit("game_notification", {
+    message: `💀 ${player.username} gavo Prakeiksmo kortą: ${drawnCard.title}!`,
+    type: "curse",
+  });
+}
+
+// 3. Kai Host'as patvirtina arba atmeta kortą (atitinka tavo socket įvykio logiką)
+function onHostResolveCard(player, card, decision) {
+  // decision gali būti: "success", "fail", arba "skip"
+
+  if (decision === "success") {
+    // Sėkmingai įvykdyta -> gauna blessing tašką
+    player.blessingPoints =
+      (player.blessingPoints || 0) + (card.blessingPoints || 1);
+    console.log(
+      `✨ Žaidėjas ${player.username} gavo blessing tašką! Viso: ${player.blessingPoints}/3`,
+    );
+
+    if (player.blessingPoints >= 3) {
+      console.log(`🎉 Žaidėjas ${player.username} surinko 3 blessing taškus!`);
+      const gameObj = Object.values(games).find((g) =>
+        g.players.some((p) => p.id === player.id),
+      );
+      if (gameObj) {
+        activateBlessing(gameObj, player);
+      }
+      player.blessingPoints = 0;
+    }
+  } else if (decision === "fail") {
+    // Atmesta / Neįvykdyta -> gauna curse tašką
+    player.cursePoints = (player.cursePoints || 0) + (card.cursePoints || 1);
+    console.log(
+      `💀 Žaidėjas ${player.username} gavo curse tašką! Viso: ${player.cursePoints}/3`,
+    );
+
+    if (player.cursePoints >= 3) {
+      console.log(`⚡ Žaidėjas ${player.username} surinko 3 curse taškus!`);
+      const gameObj = Object.values(games).find((g) =>
+        g.players.some((p) => p.id === player.id),
+      );
+      if (gameObj) {
+        activateCurse(gameObj, player);
+      }
+      player.cursePoints = 0;
+    }
+  } else if (decision === "skip") {
+    // Praleista -> nieko neduodame, tik informuojame konsolėje
+    console.log(
+      `⏭️ Žaidėjo ${player.username} veiksmas buvo praleistas (Skip).`,
+    );
+  }
+}
+
 const express = require("express");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
@@ -224,6 +317,7 @@ function broadcastGameState(roomId) {
         : player.cards,
       myTrapZoneCards: [],
       activeEffects: activeEffects,
+      roundNumber: game.roundNumber || 1,
       allCurses: game.players.map((p) => ({
         playerId: p.id,
         username: p.username,
@@ -240,7 +334,11 @@ function broadcastGameState(roomId) {
         curses: formatCurses(p.curses),
         isConnected: p.isConnected !== false,
         madMousePending: p.madMousePending || false,
+        blessingPoints: p.blessingPoints || 0,
+        cursePoints: p.cursePoints || 0,
       })),
+      isHost: sock.id === game.hostId,
+      pendingHostCards: game.pendingHostCards || [],
       currentTurnPlayerId: current ? current.id : null,
       deckCount: game.deck.length,
       discardPile: game.discardPile,
@@ -383,13 +481,22 @@ function nextTurn(roomId) {
   game.turnNumber = (game.turnNumber || 0) + 1;
   game.actionUsed = false;
 
+  // ==========================================
+  // RAUNDO SKAIČIAVIMO LOGIKA
+  // ==========================================
+  // Kai currentTurnIndex vėl grįžta į 0 (pirmą žaidėją), reiškia, kad visi praėjo ir prasideda naujas raundas!
+  if (game.currentTurnIndex === 0) {
+    game.roundNumber = (game.roundNumber || 1) + 1;
+    console.log(`🔄 Prasideda naujas raundas: ${game.roundNumber}`);
+  } else if (!game.roundNumber) {
+    game.roundNumber = 1; // Užtikriname, kad prasidėjus žaidimui būtų 1 raundas
+  }
+  // ==========================================
+
   const current = game.players[game.currentTurnIndex];
 
   // ==========================================
-  // TEISINGA ĖJIMŲ IR RATŲ SKAIČIAVIMO LOGIKA
-  // ==========================================
-
-  // 1. ĖJIMAI ("turns"): Mažėja visų žaidėjų kortoms, nes prasidėjo naujas bendras ėjimas
+  // 1. ĖJIMAI ("turns"): Mažėja visų žaidėjų kortoms...
   game.players.forEach((player) => {
     if (player.curses && player.curses.length > 0) {
       player.curses.forEach((curse) => {
@@ -400,7 +507,7 @@ function nextTurn(roomId) {
     }
   });
 
-  // 2. RATAI ("rounds"): Mažėja TIK TADA, KAI EILĖ VĖL SUGRĮŽTA PAS ŠĮ ŽAIDĖJĄ (current)
+  // 2. RATAI ("rounds"): Mažėja TIK TADA, KAI EILĖ VĖL SUGRĮŽTA PAS ŠĮ ŽAIDĖJĄ
   if (current && current.curses && current.curses.length > 0) {
     current.curses.forEach((curse) => {
       if (curse.durationType === "rounds") {
@@ -409,7 +516,7 @@ function nextTurn(roomId) {
     });
   }
 
-  // 3. IŠVALOME PASIBAIGUSIUS EFEKTUS IR SIUNČIAME PRANEŠIMUS
+  // 3. IŠVALOME PASIBAIGUSIUS EFEKTUS...
   game.players.forEach((player) => {
     if (player.curses && player.curses.length > 0) {
       const expired = player.curses.filter((c) => c.turnsLeft <= 0);
@@ -586,6 +693,44 @@ function executeEffect(roomId, initiatorId, card, targetId, extraData) {
   if (!game) return;
   const initiator = game.players.find((p) => p.id === initiatorId);
   const target = targetId ? game.players.find((p) => p.id === targetId) : null;
+
+  console.log(
+    "🃏 Vykdoma korta:",
+    card?.title,
+    "Tipas:",
+    card?.type,
+    "Efektas:",
+    card?.effect,
+    "Taikinys:",
+    target?.username,
+  );
+  // =========================================================================
+  // NAUJA: Jei korta nukreipta į kitą žaidėją ir tai yra prakeiksmas / puolimas,
+  // taikinys gauna CURSE tašką!
+  // =========================================================================
+  if (target && target.id !== initiatorId) {
+    // Tikriname, ar korta yra prakeiksmo tipo (arba prasideda su curse_)
+    const isCurseOrOffensive =
+      card.type === "curse" ||
+      card.isCurse ||
+      (card.effect && card.effect.startsWith("curse_")) ||
+      card.type === "trap"; // Jei veikia prieš kitą žaidėją
+
+    if (isCurseOrOffensive) {
+      target.cursePoints = (target.cursePoints || 0) + 1;
+      console.log(
+        `💀 Žaidėjas ${target.username} gavo curse tašką nuo ${initiator.username} kortos (${card.title})! Viso: ${target.cursePoints}/3`,
+      );
+
+      // Jei pasiekia 3 taškus, aktyvuojame prakeismą jam
+      if (target.cursePoints >= 3) {
+        console.log(`⚡ Žaidėjas ${target.username} pasiekė 3 curse taškus!`);
+        activateCurse(game, target);
+        target.cursePoints = 0; // Nuliname taškus
+      }
+    }
+  }
+  // =========================================================================
 
   if (target && target.isShielded && card.type === "action") {
     target.isShielded = false;
@@ -1335,6 +1480,7 @@ io.on("connection", (socket) => {
       madMousePending: false,
     }));
     games[roomId] = {
+      hostId: socket.id,
       players: gamePlayers,
       deck,
       taskDeck,
@@ -1442,6 +1588,65 @@ io.on("connection", (socket) => {
     broadcastGameState(data.roomId);
   });
 
+  socket.on("hostResolveCard", (data) => {
+    const { roomId, playerId, cardId, decision, pendingId } = data; // Naudojame decision vietoj success
+    const game = games[roomId];
+
+    if (!game) return;
+
+    // Patikriname, ar šis socket yra hostas
+    if (socket.id !== game.hostId) return;
+
+    // 1. Randame ir pašaliname kortą iš pendingHostCards masyvo
+    if (!game.pendingHostCards) game.pendingHostCards = [];
+    const cardIndex = game.pendingHostCards.findIndex(
+      (p) => p.id === pendingId || p.card.instanceId === cardId,
+    );
+
+    if (cardIndex === -1) return;
+    const pendingItem = game.pendingHostCards.splice(cardIndex, 1)[0];
+    const targetPlayer = game.players.find(
+      (p) => p.id === pendingItem.playerId,
+    );
+
+    if (!targetPlayer) {
+      broadcastGameState(roomId);
+      return;
+    }
+
+    // 2. Vykdome onHostResolveCard logiką (paduodame decision: "success", "fail" arba "skip")
+    onHostResolveCard(targetPlayer, pendingItem.card, decision);
+
+    // 3. Jei Host patvirtino ("success"), dabar galime įvykdyti pačios kortos efektą!
+    if (decision === "success") {
+      executeEffect(
+        roomId,
+        targetPlayer.id,
+        pendingItem.card,
+        pendingItem.targetId,
+        null,
+      );
+
+      io.to(roomId).emit("game_notification", {
+        message: `👑 Host'as patvirtino "${pendingItem.card.title}"!`,
+        type: "action",
+      });
+    } else if (decision === "fail") {
+      io.to(roomId).emit("game_notification", {
+        message: `❌ Host'as atmetė "${pendingItem.card.title}"!`,
+        type: "action",
+      });
+    } else if (decision === "skip") {
+      io.to(roomId).emit("game_notification", {
+        message: `⏭️ Host'as praleido "${pendingItem.card.title}"!`,
+        type: "action",
+      });
+    }
+
+    // 4. Atnaujiname žaidimo būseną visiems
+    broadcastGameState(roomId);
+  });
+
   socket.on("play_card", (data) => {
     const { roomId, cardInstanceId, targetId, extraData } = data;
     const game = games[roomId];
@@ -1491,7 +1696,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Spąstų kortų logika
+    // Spąstų kortų logika (Trap)
     if (card.type === "trap") {
       game.tableCards.push({
         id: `tc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -1513,22 +1718,54 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // 3. Išimame kortą iš rankos ir dedame į išmestų kortų krūvą
+    // ==========================================
+    // 👑 HOST PATVIRTINIMO INICIJAVIMAS ACTION KORTOMS
+    // ==========================================
+    if (card.type === "action") {
+      // 1. Išimame kortą iš rankos ir pažymime, kad veiksmas panaudotas
+      player.cards.splice(cardIdx, 1);
+      // game.actionUsed = true;
+
+      // 2. Užtikriname, kad masyvas egzistuoja
+      if (!game.pendingHostCards) game.pendingHostCards = [];
+
+      // 3. Įdedame kortą į Host laukiančiųjų sąrašą
+      game.pendingHostCards.push({
+        id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        playerId: player.id,
+        playerName: player.username,
+        card: card,
+        targetId: targetId || null,
+        timestamp: Date.now(),
+      });
+
+      // 4. Perkeliame į išmestų kortų krūvą
+      game.discardPile.push(makeEntry(card, player.username));
+
+      // 5. Informuojame visus žaidėjus
+      io.to(roomId).emit("game_notification", {
+        message: `${player.username} sužaidė "${card.title}" – laukiama Host'o patvirtinimo!`,
+        type: "action",
+      });
+
+      io.to(roomId).emit("card_played_display", {
+        card: { ...card },
+        playerName: player.username,
+        playerId: socket.id,
+      });
+
+      // 6. Atnaujiname būseną (Host'as iškart pamatys kortą HostJudgePanel skydelyje)
+      broadcastGameState(roomId);
+      return; // 🛑 Sustabdome tolesnį kodą, kad efektas neįvyktų iš karto!
+    }
+
+    // Jei tai kito tipo korta (ne action), tęsiame įprastą vykdymą...
     player.cards.splice(cardIdx, 1);
     game.discardPile.push(makeEntry(card, player.username));
-    game.actionUsed = true;
-
-    // 4. KORTOS EFEKTŲ APDOROJIMAS (Čia pridedami prakeikimai ir kiti efektai)
+    // game.actionUsed = true;
 
     const target = game.players.find((p) => p.id === targetId);
-    console.log(
-      "🎯 Rastas taikinys žaidėjas:",
-      target ? target.username : "NERASTAS!",
-    );
-    console.log(
-      "👥 Visi žaidėjai kambaryje:",
-      game.players.map((p) => ({ username: p.username, id: p.id })),
-    );
+
     switch (card.effect) {
       case "curse_silence": {
         if (!target) break;
@@ -1552,17 +1789,14 @@ io.on("connection", (socket) => {
         });
         break;
       }
-      // Čia vėliau galėsi pridėti ir kitus efektus, pvz., case "curse_blind": ...
     }
 
-    // 5. Informuojame visus žaidėjus kambaryje apie padėtą kortą
     io.to(roomId).emit("card_played_display", {
       card: { ...card },
       playerName: player.username,
       playerId: socket.id,
     });
 
-    // 6. Atnaujiname bendrą žaidimo būseną
     broadcastGameState(roomId);
   });
 
@@ -1581,6 +1815,28 @@ io.on("connection", (socket) => {
     game.tableCards = game.tableCards.filter((t) => t.id !== tableCardId);
     const player = game.players.find((p) => p.id === socket.id);
 
+    // =========================================================================
+    // 💀 PRADŽIA: CURSE TAŠKŲ SKAIČIAVIMAS TAIKINIUI UŽ SPĄSTUS
+    // =========================================================================
+    if (targetId) {
+      const targetPlayer = game.players.find((p) => p.id === targetId);
+      if (targetPlayer) {
+        targetPlayer.cursePoints = (targetPlayer.cursePoints || 0) + 1;
+        console.log(
+          `💀 Žaidėjas ${targetPlayer.username} gavo curse tašką nuo ${player?.username || "spąstų"}! Viso: ${targetPlayer.cursePoints}/3`,
+        );
+
+        if (targetPlayer.cursePoints >= 3) {
+          console.log(
+            `⚡ Žaidėjas ${targetPlayer.username} surinko 3 curse taškus!`,
+          );
+          activateCurse(game, targetPlayer);
+          targetPlayer.cursePoints = 0; // Nuliname taškus
+        }
+      }
+    }
+    // =========================================================================
+
     const pl = game.players.find((p) => p.id === socket.id);
     if (pl)
       io.to(roomId).emit("card_played_display", {
@@ -1588,7 +1844,7 @@ io.on("connection", (socket) => {
         playerName: pl.username,
         playerId: socket.id,
       });
-    game.actionUsed = true;
+    // game.actionUsed = true;
     broadcastGameState(roomId);
     // startReactionWindow(roomId, socket.id, null, null, null, true);
   });

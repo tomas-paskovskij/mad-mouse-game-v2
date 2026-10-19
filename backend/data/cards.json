@@ -8,6 +8,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Kas paskutinis paliečia stalą — pralaimi",
     "art": "⚡"
   },
@@ -20,6 +22,8 @@
     "requiresTarget": true,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Priešininkas duoda raidę, grupė skaičiuoja laiką",
     "art": "🐾"
   },
@@ -32,6 +36,8 @@
     "requiresTarget": true,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 2,
+    "cursePoints": 1,
     "socialTrigger": "Priešininkas skiria intervalą",
     "art": "🔠"
   },
@@ -44,6 +50,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Žaidžiama gyvai ratu — kas sustoja, atiduoda kortą",
     "art": "🔗"
   },
@@ -56,6 +64,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Grupė skaičiuoja daiktus ir laiką",
     "art": "👉"
   },
@@ -68,6 +78,8 @@
     "requiresTarget": true,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "socialTrigger": "Rodomi pirštai vienu metu 1-2-3!",
     "art": "🧠"
   },
@@ -80,6 +92,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 2,
+    "cursePoints": 1,
     "socialTrigger": "Atminties grandinė ratu",
     "art": "🛒"
   },
@@ -92,6 +106,8 @@
     "requiresTarget": true,
     "isLightning": false,
     "count": 4,
+    "blessingPoints": 2,
+    "cursePoints": 1,
     "socialTrigger": "Objektyvus žinių patikrinimas",
     "art": "🏛️"
   },
@@ -104,6 +120,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Grupė laiko laiką ir klausosi",
     "art": "👅"
   },
@@ -116,6 +134,8 @@
     "requiresTarget": true,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "socialTrigger": "Taikinys turi mėgdžioti — grupė stebi",
     "art": "🪞"
   },
@@ -128,6 +148,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "socialTrigger": "Piešk ore — kas pirmas atspėja",
     "art": "✏️"
   },
@@ -140,6 +162,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Grupė skaičiuoja sekundes",
     "art": "⚡"
   },
@@ -152,6 +176,8 @@
     "requiresTarget": true,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 2,
+    "cursePoints": 1,
     "socialTrigger": "Slapta sąjunga — kiti bando pagauti gestą",
     "art": "🤫"
   },
@@ -164,6 +190,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Greitas rimo ieškojimas ratu",
     "art": "🎵"
   },
@@ -176,6 +204,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "socialTrigger": "Grupė sprendžia galvosūkį",
     "art": "🧩"
   },
@@ -188,6 +218,8 @@
     "requiresTarget": true,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "socialTrigger": "Atsakymas vienu metu",
     "art": "🤝"
   },
@@ -200,6 +232,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Kas pirmas nebeturi žodžio — pralaimi",
     "art": "📚"
   },
@@ -212,6 +246,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Laikyk roboto balsą iki kito ėjimo",
     "art": "🤖"
   },
@@ -224,6 +260,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "socialTrigger": "Kairysis turi atiduoti penkis",
     "art": "✋"
   },
@@ -236,6 +274,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Žiūrėjimas į akis nemirksint",
     "art": "👁️"
   },
@@ -248,6 +288,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Mimika be žodžių — kas neatspėja moka",
     "art": "🎬"
   },
@@ -260,6 +302,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "socialTrigger": "Mušk ritmą — kas atspėja laimi",
     "art": "🎵"
   },
@@ -272,6 +316,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Visi turi laikytis laikinos taisyklės",
     "art": "📋"
   },
@@ -284,6 +330,8 @@
     "requiresTarget": true,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 2,
+    "cursePoints": 1,
     "socialTrigger": "Pasakyk žodį atbulai",
     "art": "🔄"
   },
@@ -296,6 +344,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 1,
+    "cursePoints": 1,
     "socialTrigger": "Kas paskutinis pakelia ranką",
     "art": "✋"
   },
@@ -308,6 +358,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "trigger": "Kai kas nors pasako draudžiamą žodį",
     "socialTrigger": "Gyvai stebi pokalbį",
     "art": "🚔"
@@ -321,6 +373,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 3,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "trigger": "Kai kas nors nusijuokia",
     "socialTrigger": "Gyvai stebi — kas nusijuokia",
     "art": "😄"
@@ -334,6 +388,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "trigger": "Kai kas nors liečia telefoną",
     "socialTrigger": "Gyvai stebi — kas liečia telefoną",
     "art": "📵"
@@ -347,6 +403,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "trigger": "Kai prie stalo įstoja tyla",
     "socialTrigger": "Laikai laiką — kas tyli per ilgai",
     "art": "🤐"
@@ -360,6 +418,8 @@
     "requiresTarget": true,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "trigger": "Kai kas nors pasako tikrą vardą",
     "socialTrigger": "Visi turi naudoti sugalvotą pravardę",
     "art": "🏷️"
@@ -373,6 +433,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "trigger": "Kai kas nors pakelia abi rankas",
     "socialTrigger": "Gyvai stebi — kas gestikuliuoja",
     "art": "🙌"
@@ -386,6 +448,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "trigger": "Kai kas nors sako 'prisiekiu' ar 'tikrai'",
     "socialTrigger": "Klausai pokalbio frazių",
     "art": "✋"
@@ -399,6 +463,8 @@
     "requiresTarget": true,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "trigger": "Automatiškai po 2 ratų",
     "socialTrigger": "Įtampa — visi skaičiuoja ratus",
     "art": "💣"
@@ -412,6 +478,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 2,
+    "cursePoints": 0,
     "trigger": "Kai kitas aktyvuoja social kortą",
     "socialTrigger": "Spėk kito sėkmę",
     "art": "🎯"
@@ -425,6 +493,8 @@
     "requiresTarget": false,
     "isLightning": false,
     "count": 2,
+    "blessingPoints": 1,
+    "cursePoints": 0,
     "trigger": "Kai kas nors atsako klausimu į klausimą",
     "socialTrigger": "Gyvai stebi dialogus",
     "art": "❔"
@@ -438,6 +508,8 @@
     "requiresTarget": false,
     "isLightning": true,
     "count": 4,
+    "blessingPoints": 0,
+    "cursePoints": 0,
     "socialTrigger": "Naudoji bet kada — net ne savo ėjime",
     "art": "🚫"
   },
@@ -450,6 +522,8 @@
     "requiresTarget": false,
     "isLightning": true,
     "count": 3,
+    "blessingPoints": 0,
+    "cursePoints": 0,
     "socialTrigger": "Naudoji kai esi taikinys",
     "art": "↩️"
   },
@@ -462,6 +536,8 @@
     "requiresTarget": false,
     "isLightning": true,
     "count": 3,
+    "blessingPoints": 0,
+    "cursePoints": 0,
     "socialTrigger": "Naudoji bet kada — galioja visą ratą",
     "art": "🛡️"
   },
@@ -474,6 +550,8 @@
     "requiresTarget": false,
     "isLightning": true,
     "count": 2,
+    "blessingPoints": 0,
+    "cursePoints": 0,
     "socialTrigger": "Sukuria natūralią pauzę pokalbiui",
     "art": "⏸️"
   },
@@ -486,6 +564,8 @@
     "requiresTarget": false,
     "isLightning": true,
     "count": 3,
+    "blessingPoints": 0,
+    "cursePoints": 0,
     "socialTrigger": "Naudoji kai kitas traukia kortą",
     "art": "✌️"
   },
@@ -498,6 +578,8 @@
     "requiresTarget": false,
     "isLightning": true,
     "count": 2,
+    "blessingPoints": 0,
+    "cursePoints": 0,
     "socialTrigger": "Prisijunk prie kito laimėjimo",
     "art": "🤜"
   }

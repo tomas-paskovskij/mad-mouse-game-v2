@@ -5,10 +5,21 @@ import { socket } from "../services/socket";
 export interface CardType {
   instanceId: string;
   id: string;
-  type: "action" | "trap" | "response" | "curse" | "interrupt" | "goal";
+  type:
+    | "action"
+    | "trap"
+    | "response"
+    | "curse"
+    | "interrupt"
+    | "goal"
+    | "blessing";
   title: string;
   description: string;
   effect: string;
+  art?: string;
+  socialTrigger?: string;
+  blessingPoints?: number;
+  cursePoints?: number;
   isLightning?: boolean;
   requiresTarget?: boolean;
   requiresCardSelection?: boolean;
@@ -40,6 +51,8 @@ export interface Player {
   curses?: any[];
   isConnected?: boolean;
   madMousePending?: boolean;
+  blessingPoints?: number;
+  cursePoints?: number;
 }
 
 export interface OpponentInfo extends Player {}
@@ -91,6 +104,7 @@ interface GameStore {
 
   myCards: CardType[];
   myTrapZoneCards: CardType[];
+  allCurses: any[];
   opponents: Player[];
   players: Player[]; // Alias dėl suderinamumo su UI
   handCards: CardType[]; // Alias dėl suderinamumo su UI
@@ -102,10 +116,27 @@ interface GameStore {
   pendingAction: PendingAction | null;
   winner: string | null;
   turnNumber: number;
+  roundNumber: number;
   handLimit: number;
   phase: string;
   actionUsed: boolean;
   madMousePlayerId: string | null;
+
+  // HOST IR PATVIRTINIMO BŪSENA
+  isHost: boolean;
+  pendingHostCards: Array<{
+    id: string;
+    playerId: string;
+    playerName: string;
+    card: CardType;
+    timestamp: number;
+  }>;
+  resolveHostAction: (
+    playerId: string,
+    cardId: string,
+    decision: "success" | "fail" | "skip",
+    pendingId: string,
+  ) => void;
 
   // UI ir Istorijos būsenos
   selectedCard: CardType | null;
@@ -134,6 +165,9 @@ interface GameStore {
     cards: CardType[];
   } | null;
   actionNeedsTarget: { card: CardType; initiatorId: string } | null;
+
+  // Testavimo funkcijos
+  testDrawCard: (roomId: string, type: "blessing" | "curse") => void;
 
   // Chain Actions
   addChainEntry: (data: {
@@ -209,28 +243,7 @@ export const useGameStore = create<GameStore>()(
       stageActive: false,
       stageIdx: 0,
       stageTimer: null,
-      activeEffects: [
-        // {
-        //   id: "test-1",
-        //   title: "Tylos prakeikimas",
-        //   type: "CURSE",
-        //   description: "Negalite kalbėti 2 ėjimus.",
-        //   icon: "🧁",
-        //   remainingTurns: 2,
-        //   maxTurns: 2,
-        //   stacks: 1,
-        // },
-        // {
-        //   id: "test-1",
-        //   title: "Tylos prakeikimas",
-        //   type: "CURSE",
-        //   description: "Negalite kalbėti 2 ėjimus.",
-        //   icon: "🧁",
-        //   remainingTurns: 2,
-        //   maxTurns: 2,
-        //   stacks: 1,
-        // },
-      ],
+      activeEffects: [],
 
       myCards: [],
       myTrapZoneCards: [],
@@ -245,6 +258,7 @@ export const useGameStore = create<GameStore>()(
       pendingAction: null,
       winner: null,
       turnNumber: 1,
+      roundNumber: 1,
       handLimit: 100000,
       phase: "playing",
       actionUsed: false,
@@ -254,6 +268,21 @@ export const useGameStore = create<GameStore>()(
       inspectResult: null,
       inspectStealResult: null,
       actionNeedsTarget: null,
+
+      // Host būsena ir funkcijos
+      isHost: false,
+      pendingHostCards: [],
+
+      resolveHostAction: (playerId, cardId, decision, pendingId) => {
+        const roomId = get().roomId; // Paimame esamą kambario ID iš store
+        socket.emit("hostResolveCard", {
+          roomId,
+          playerId,
+          cardId,
+          decision, // Siunčiame "success", "fail" arba "skip"
+          pendingId,
+        });
+      },
 
       // UI ir Istorija
       selectedCard: null,
@@ -267,7 +296,6 @@ export const useGameStore = create<GameStore>()(
       stealTargetPlayer: null,
 
       testDrawCard: (roomId: string, type: "blessing" | "curse") => {
-        // Naudojame tą pačią socket konstanta/kintamąjį, kuris jau yra iškeltas viršutinėje store failo dalyje
         socket.emit("test_draw_card", { roomId, type });
       },
 
@@ -275,7 +303,7 @@ export const useGameStore = create<GameStore>()(
         set((state) => ({
           activeEffects: [
             { ...effect, id: `effect-${Date.now()}` },
-            ...state.activeEffects, // Naujas efektas eina į priekį!
+            ...state.activeEffects,
           ],
         })),
 
@@ -380,6 +408,14 @@ export const useGameStore = create<GameStore>()(
 
           socket.on("game_state_update", (state: any) => {
             console.log("📥 Klientas gavo state update:", state.activeEffects);
+            console.log(
+              "📥 Serverio state update - Žaidėjų taškai:",
+              state.opponents?.map((p: any) => ({
+                name: p.username,
+                blessing: p.blessingPoints,
+                curse: p.cursePoints,
+              })),
+            );
 
             const myCards = state.myCards ?? [];
             const opponents = state.opponents ?? [];
@@ -387,6 +423,7 @@ export const useGameStore = create<GameStore>()(
 
             set((s) => ({
               chain: state.chain ?? s.chain,
+              roundNumber: state.roundNumber ?? s.roundNumber ?? 1,
               stageActive: state.stageActive ?? s.stageActive,
               stageIdx: state.stageIdx ?? s.stageIdx,
               myCards,
@@ -395,11 +432,13 @@ export const useGameStore = create<GameStore>()(
               allCurses: state.allCurses || [],
               opponents,
               players,
+              isHost: state.isHost ?? s.isHost,
               currentTurnPlayerId: state.currentTurnPlayerId ?? null,
               deckCount: state.deckCount ?? 0,
               discardPile: state.discardPile ?? [],
               tableCards: state.tableCards ?? [],
               pendingAction: state.pendingAction ?? null,
+              pendingHostCards: state.pendingHostCards ?? s.pendingHostCards,
               winner: state.winner ?? null,
               turnNumber: state.turnNumber ?? 1,
               handLimit: state.handLimit ?? 100000,
@@ -413,6 +452,21 @@ export const useGameStore = create<GameStore>()(
                   ? state.elapsedSeconds
                   : s.elapsedSeconds,
             }));
+          });
+
+          // HOST PATVIRTINIMO SOCKET ĮVYKIAI
+          socket.on(
+            "cardPlayedPending",
+            (data: {
+              player: { id: string; name: string };
+              card: CardType;
+            }) => {
+              set({ pendingHostAction: data });
+            },
+          );
+
+          socket.on("cardResolved", () => {
+            set({ pendingHostAction: null });
           });
 
           // Chain Socket įvykiai
@@ -505,10 +559,8 @@ export const useGameStore = create<GameStore>()(
       playCard: (cardInstanceId, targetId, extraData) => {
         const { roomId, myCards } = get();
 
-        // 1. Randame kortą rankoje, kad patikrintume, ar jai reikia taikinio
         const card = myCards.find((c) => c.instanceId === cardInstanceId);
 
-        // 2. Jei korta reikalauja taikinio, bet taikinys nepaduotas:
         if (card?.requiresTarget && !targetId) {
           console.log(
             "🛑 Korta reikalauja taikinio! Atidarome pasirinkimo langą.",
@@ -520,10 +572,9 @@ export const useGameStore = create<GameStore>()(
             },
             selectedCard: null,
           });
-          return; // Sustabdom siuntimą į serverį kol nepasirinkta
+          return;
         }
 
-        // 3. Jei viskas gerai, siunčiame į serverį
         if (roomId)
           socket.emit("play_card", {
             roomId,
@@ -537,7 +588,6 @@ export const useGameStore = create<GameStore>()(
       selectTarget: (targetId, extraData) => {
         const { roomId, actionNeedsTarget } = get();
         if (roomId && actionNeedsTarget) {
-          // Siunčiame kortą į serverį su pasirinktu taikiniu!
           socket.emit("play_card", {
             roomId,
             cardInstanceId: actionNeedsTarget.card.instanceId,
@@ -616,7 +666,7 @@ export const useGameStore = create<GameStore>()(
         set((s) => ({ history: [...s.history.slice(-49), entry] })),
       setTrapActivating: (trap) => set({ trapActivating: trap }),
       setStealTargetPlayer: (player) => set({ stealTargetPlayer: player }),
-      // 1. PAIMTI / ATIMTI KORTĄ (Steal / Take)
+
       stealCardFromPlayer: (
         targetPlayerId,
         cardInstanceId,
@@ -627,21 +677,19 @@ export const useGameStore = create<GameStore>()(
           socket.emit("steal_card", {
             roomId,
             targetPlayerId,
-            cardInstanceId, // Jei nurodoma konkreti korta (pvz. nuo stalo), arba undefined (jei atsitiktinė iš rankos)
-            source, // "hand" arba "table"
+            cardInstanceId,
+            source,
           });
         }
-        // set({ stealTargetPlayer: null }); // Uždaro UI modalą
       },
 
-      // 2. DUOTI KORTĄ (Give / Transfer)
       giveCardToPlayer: (targetPlayerId, cardInstanceId) => {
         const { roomId } = get();
         if (roomId) {
           socket.emit("give_card", {
             roomId,
             targetPlayerId,
-            cardInstanceId, // Korta iš mano `myCards`, kurią noriu atiduoti
+            cardInstanceId,
           });
         }
       },

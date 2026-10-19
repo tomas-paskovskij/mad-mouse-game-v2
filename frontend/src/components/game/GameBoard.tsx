@@ -17,6 +17,7 @@ import { HistoryPanel } from "./HistoryPanel";
 import { ReactionWindow } from "./ReactionWindow";
 import { ActiveEffectsBar } from "./ActiveEffectsBar";
 import TaskTestPanel from "./TaskTestPanel";
+import { HostJudgePanel } from "./HostJudgePanel";
 
 // Modalai
 import { PlayModal } from "./modals/PlayModal";
@@ -103,12 +104,13 @@ export const GameBoard: React.FC = () => {
       {/* 3. PAGRINDINIS ŽAIDIMO LAUKAS (STALAS) */}
       <div className="main-content-side-section">
         <div className="main-content-section flex-1">
+          <HostJudgePanel />
           <PlayersSection />
           <ChainSection />
           <TrapsSection />
 
-          {/* Centrinis emoji flash efektas gaunant pranešimą */}
-          <AnimatePresence>
+          {/* Centrinis emoji flash efektas gaunant pranešimą [isimtas] */}
+          {/* <AnimatePresence>
             {flash && (
               <motion.div
                 className="flash-center"
@@ -130,6 +132,11 @@ export const GameBoard: React.FC = () => {
                 {flash}
               </motion.div>
             )}
+          </AnimatePresence> */}
+
+          <AnimatePresence>
+            <CardMenu key="card-menu" />
+            <TrapMenu key="trap-menu" />
           </AnimatePresence>
 
           {/* Mad Mouse statuso pranešimas */}
@@ -144,7 +151,7 @@ export const GameBoard: React.FC = () => {
         <PilesSection />
 
         {/* Laikinas testinis skydelis kampe */}
-        <TaskTestPanel roomId={roomId} />
+        {/* <TaskTestPanel roomId={roomId} /> */}
       </div>
 
       {/* 4. ŽAIDĖJO KORTŲ RANKA */}

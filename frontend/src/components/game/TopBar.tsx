@@ -15,6 +15,7 @@ export const TopBar: React.FC = () => {
   const setShowHistory = useGameStore((s) => (s as any).setShowHistory);
   const toggleHistory = useGameStore((s) => (s as any).toggleHistory);
   const declareMadMouse = useGameStore((s) => (s as any).declareMadMouse);
+  const roundNumber = useGameStore((state) => state.roundNumber);
 
   const [localSeconds, setLocalSeconds] = useState(0);
 
@@ -56,7 +57,7 @@ export const TopBar: React.FC = () => {
 
   return (
     <header className="top-bar">
-      <span className="top-round">Round 1</span>
+      <span className="top-round">Round {roundNumber}</span>
 
       <div className={`turn-badge ${isMyTurn ? "turn-badge--mine" : ""}`}>
         {isMyTurn ? "Your turn" : currentTurnName}
